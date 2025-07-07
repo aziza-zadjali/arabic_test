@@ -28,7 +28,9 @@ if option == "توليد سؤال لمعنى كلمة":
             elif not main_word.strip():
                 st.error("يرجى إدخال كلمة رئيسية.")
             else:
-                question, answer = create_question(main_word, reference_questions, selected_grade)
+                question, answer, msg = create_question(main_word, reference_questions, selected_grade)
+                if msg:
+                    st.warning(msg)
                 st.markdown(question)
                 st.success(f"الإجابة الصحيحة: {answer}")
 
@@ -42,6 +44,8 @@ else:
                 st.error("لا توجد أسئلة مرجعية في هذه المرحلة/المهارة. تأكد من وجود الملفات في المسار الصحيح.")
             else:
                 test = generate_meaning_test(num_questions, reference_questions, selected_grade)
-                for idx, (question, answer) in enumerate(test, 1):
+                for idx, (question, answer, msg) in enumerate(test, 1):
+                    if msg:
+                        st.warning(f"سؤال {idx}: {msg}")
                     st.markdown(f"**{idx}. {question}**")
                     st.success(f"الإجابة الصحيحة: {answer}")
