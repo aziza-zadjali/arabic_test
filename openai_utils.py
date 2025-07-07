@@ -13,7 +13,7 @@ Instructions:
 - All words must be close in meaning (synonyms or semantically related).
 - Do not repeat words.
 - Do not include words with the same root as the main word.
-- Preferably, all generated choices should have the same Arabic morphological pattern (وزن) and the same number of letters as each other (e.g., all on وزن فعيل, or all on وزن مفاعل, etc.), **but if this is not possible, you may relax this constraint and provide the best set of distractors you can.**
+- Preferably, all generated choices should have the same Arabic morphological pattern (وزن) and the same number of letters as each other (e.g., all on وزن فعيل, or all on وزن مفاعل, etc.), but if this is not possible, you may relax this constraint and provide the best set of distractors you can.
 - List the pattern (وزن) you used (if any), then list the words (each on a new line, no phrases).
 
 Examples (use this format exactly):
@@ -72,6 +72,7 @@ CONTEXTUAL_PROMPT = """
 - خيار واحد فقط هو الصحيح (مرادف أو الأقرب معنى في السياق).
 - وضّح رمز الإجابة الصحيحة في نهاية السؤال.
 - يُفضّل أن تكون جميع البدائل على نفس الوزن وعدد الحروف بعضها مع بعض (لكن ليس بالضرورة نفس الكلمة الرئيسية أو الكلمة التي تحتها خط). إذا لم يكن ذلك ممكنًا، يمكنك تخفيف هذا الشرط وتقديم أفضل مجموعة متاحة من البدائل.
+- لا تدرج كلمات تشترك في الجذر مع الكلمة التي تحتها خط.
 
 أمثلة:
 1. ما رمز الكلمة الصحيحة التي تعتبر الأقرب معنى للكلمة التي تحتها خط في الجملة الموجودة في رأس السؤال؟
@@ -192,6 +193,13 @@ def is_semantically_related(main_word, candidate, client, model="gpt-4.1"):
         return True
     return False
 
+def share_root(word1, word2):
+    # Very basic heuristic: if the first 3 (or 4) letters after "ال" match, consider as same root.
+    # For production, use a real Arabic root extractor.
+    w1 = normalize_al(word1)
+    w2 = normalize_al(word2)
+    return w1[:3] == w2[:3] or w1[:4] == w2[:4]
+
 def generate_mcq_arabic_word_meaning(main_word, reference_questions, grade):
     prompt = f"""{PROMPT_HEADER}
 الكلمة الرئيسية: "{main_word}"
@@ -210,6 +218,10 @@ def generate_mcq_arabic_word_meaning(main_word, reference_questions, grade):
 
     if has_al(main_word):
         filtered = ensure_al(filtered)
+
+    # Remove candidates with the same root as the main word
+    filtered = [w for w in filtered if not share_root(main_word, w)]
+    candidate_words_no_root = [w for w in candidate_words if not share_root(main_word, w)]
 
     # 1. Try strict: pattern+length+semantic
     correct_synonym = None
@@ -231,7 +243,7 @@ def generate_mcq_arabic_word_meaning(main_word, reference_questions, grade):
 
     # 2. Relax: just semantic (ignore pattern/length)
     semantically_related = []
-    for w in candidate_words:
+    for w in candidate_words_no_root:
         if is_semantically_related(main_word, w, client):
             semantically_related.append(w)
         if len(semantically_related) == 4:
@@ -246,8 +258,8 @@ def generate_mcq_arabic_word_meaning(main_word, reference_questions, grade):
         msg = "تم تخفيف شرط الوزن وعدد الحروف لضمان جودة الخيارات."
         return question, answer, msg
 
-    # 3. Fallback: just give first 4 candidates
-    choices = candidate_words[:4]
+    # 3. Fallback: just give first 4 candidates (excluding same root)
+    choices = candidate_words_no_root[:4]
     if choices:
         letters = ['أ', 'ب', 'ج', 'د']
         display_choices = [f"{letters[i]}) {choices[i]}" for i in range(len(choices))]
@@ -331,6 +343,11 @@ def enforce_al_in_context_choices(question_text):
         return f"{label}- {word}"
     return re.sub(r'([أ-د][\)\-]?)\s*([^\n]+)', repl, question_text)
 
+def share_root(word1, word2):
+    w1 = normalize_al(word1)
+    w2 = normalize_al(word2)
+    return w1[:3] == w2[:3] or w1[:4] == w2[:4]
+
 def generate_mcq_contextual_word_meaning(reference_questions, grade):
     prompt = CONTEXTUAL_PROMPT + "\n\nيرجى توليد سؤال واحد فقط بالتنسيق أعلاه."
     response = client.chat.completions.create(
@@ -341,7 +358,23 @@ def generate_mcq_contextual_word_meaning(reference_questions, grade):
     )
     gpt_output = response.choices[0].message.content.strip()
     question_part, answer_line = extract_contextual_mcq_parts(gpt_output)
-    return question_part, answer_line
+
+    # Remove choices with same root as underlined word
+    underlined_word = extract_underlined_word(question_part)
+    if underlined_word:
+        lines = question_part.split('\n')
+        new_lines = []
+        for line in lines:
+            m = re.match(r'^([أ-د][\)\-]?)\s*(.+)', line.strip())
+            if m:
+                choice_word = m.group(2)
+                if not share_root(underlined_word, choice_word):
+                    new_lines.append(line)
+            else:
+                new_lines.append(line)
+        question_part = '\n'.join(new_lines)
+
+    return question_part.strip(), answer_line
 
 def generate_contextual_test_llm(num_questions, reference_questions, grade):
     questions = []
