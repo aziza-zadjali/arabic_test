@@ -1,10 +1,8 @@
 import openai
 import re
 from config import get_openai_api_key
-from camel_tools.morphology.analyzer import Analyzer
 
 client = openai.OpenAI(api_key=get_openai_api_key())
-analyzer = Analyzer.pretrained()
 
 PROMPT_HEADER = """
 You are an expert in Arabic language assessment. Generate a pool of at least 10 Arabic words (not including the main word), all close in meaning to the main word, as possible distractors for an MCQ. The words should be in a list, each on a new line, and should be single words (not phrases).
@@ -67,29 +65,14 @@ Examples (use this format exactly):
 دفع
 """
 
-def get_wazn(word):
-    analyses = analyzer.analyze(word)
-    for analysis in analyses:
-        if 'pattern' in analysis and analysis['pattern']:
-            return analysis['pattern']
-    return None
-
-def filter_by_wazn_and_length(words):
-    # Group words by (pattern, length)
-    pattern_length_groups = {}
-    for word in words:
-        wazn = get_wazn(word)
-        if wazn:
-            key = (wazn, len(word))
-            pattern_length_groups.setdefault(key, []).append(word)
-    # Find a group with at least 4 words
-    for group in pattern_length_groups.values():
-        if len(group) >= 4:
-            return group[:4]
-    return []
+def filter_by_length(words):
+    if not words:
+        return []
+    target_len = len(words[0])
+    filtered = [w for w in words if len(w) == target_len]
+    return filtered if len(filtered) >= 4 else words[:4]
 
 def extract_candidate_words(gpt_output, main_word):
-    # Extract words (one per line, not containing the main word)
     lines = gpt_output.strip().split('\n')
     words = []
     for line in lines:
@@ -99,7 +82,6 @@ def extract_candidate_words(gpt_output, main_word):
     return words
 
 def generate_mcq_arabic_word_meaning(main_word, reference_questions, grade):
-    # Step 1: Generate candidate words
     prompt = f"""{PROMPT_HEADER}
 الكلمة الرئيسية: "{main_word}"
 الأسئلة المرجعية: {reference_questions[:3]}
@@ -109,21 +91,16 @@ def generate_mcq_arabic_word_meaning(main_word, reference_questions, grade):
         model="gpt-3.5-turbo",
         messages=[{"role": "user", "content": prompt}],
         temperature=0.6,
-        max_tokens=300,
+        max_tokens=400,
     )
     gpt_output = response.choices[0].message.content.strip()
     candidate_words = extract_candidate_words(gpt_output, main_word)
-
-    # Step 2: Filter by pattern and length
-    filtered = filter_by_wazn_and_length(candidate_words)
+    filtered = filter_by_length(candidate_words)
     if len(filtered) < 4:
-        return ("تعذر توليد خيارات متوافقة في الوزن والحروف. حاول بكلمة أخرى.", "")
-
-    # Step 3: Format MCQ
+        return ("تعذر توليد خيارات متوافقة في عدد الحروف. حاول بكلمة أخرى.", "")
     letters = ['أ', 'ب', 'ج', 'د']
     choices = [f"{letters[i]}) {filtered[i]}" for i in range(4)]
     question = f"ما معنى كلمة \"{main_word}\"؟\n\n" + "\n".join(choices)
-    # For demonstration, pick the first as correct (or you can use LLM to pick)
     answer = choices[0]
     return question, answer
 
@@ -131,7 +108,6 @@ def generate_meaning_test_llm(num_questions, reference_questions, grade):
     questions = []
     used_words = set()
     for _ in range(num_questions):
-        # Ask LLM for a suitable Arabic word for MCQ (not already used)
         prompt = "Suggest a single, exam-appropriate Arabic word (not a phrase) for a vocabulary MCQ for grade 7/8. Do not repeat previous words."
         response = client.chat.completions.create(
             model="gpt-3.5-turbo",
