@@ -180,22 +180,32 @@ def generate_mcq_arabic_word_meaning(main_word, reference_questions, grade):
 def generate_meaning_test_llm(num_questions, reference_questions, grade):
     questions = []
     used_words = set()
-    max_attempts = num_questions * 7  # Avoid infinite loops
+    max_attempts = num_questions * 10  # Allow more attempts to find valid questions
     attempts = 0
-    while len(questions) < num_questions and attempts < max_attempts:
-        attempts += 1
-        prompt = "Suggest a single, exam-appropriate Arabic word (not a phrase) for a vocabulary MCQ for grade 7/8. Do not repeat previous words."
-        response = client.chat.completions.create(
-            model="gpt-4.1",
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.7,
-            max_tokens=20,
-        )
-        main_word = response.choices[0].message.content.strip().split()[0]
+
+    # 1. Ask the LLM for a list of Arabic words relevant to the grade
+    prompt = (
+        f"اقترح قائمة من 15 كلمة عربية مناسبة لاختبار معاني الكلمات للصف {grade} "
+        "يُفضل أن تكون الكلمات شائعة في مناهج هذا الصف، وليست أسماء أعلام أو كلمات تخصصية."
+        "اكتب كل كلمة في سطر منفصل، ولا تكرر الكلمات."
+    )
+    response = client.chat.completions.create(
+        model="gpt-4.1",
+        messages=[{"role": "user", "content": prompt}],
+        temperature=0.7,
+        max_tokens=100,
+    )
+    candidate_words = [w.strip() for w in response.choices[0].message.content.strip().split('\n') if w.strip()]
+    
+    # 2. For each candidate word, try to generate a valid MCQ
+    for main_word in candidate_words:
+        if len(questions) >= num_questions:
+            break
         if main_word in used_words:
             continue
         used_words.add(main_word)
         q, a, msg = generate_mcq_arabic_word_meaning(main_word, reference_questions, grade)
-        if q and a:
+        # Only accept questions where a correct answer (synonym/meaning) is found and no warning message
+        if q and a and not msg:
             questions.append((q, a, msg))
     return questions
