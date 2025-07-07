@@ -143,54 +143,44 @@ def generate_mcq_arabic_word_meaning(main_word, reference_questions, grade):
     )
     gpt_output = response.choices[0].message.content.strip()
     candidate_words = extract_candidate_words(gpt_output, main_word)
-
-    # 1. Try all constraints: length + semantic
     filtered = filter_by_length(candidate_words)
-    semantically_related = []
+
+    # 1. Find at least one correct synonym/meaning match
+    correct_synonym = None
+    distractors = []
     for w in filtered:
-        if is_semantically_related(main_word, w, client):
-            semantically_related.append(w)
-        if len(semantically_related) == 4:
-            break
-    if len(semantically_related) == 4:
-        letters = ['أ', 'ب', 'ج', 'د']
-        choices = [f"{letters[i]}) {semantically_related[i]}" for i in range(4)]
-        question = f"ما معنى كلمة \"{main_word}\"؟\n\n" + "\n".join(choices)
-        answer = choices[0]
-        return question, answer, None
+        if is_semantically_related(main_word, w, client) and not correct_synonym:
+            correct_synonym = w
+        else:
+            distractors.append(w)
+    msg = None
 
-    # 2. Relax semantic constraint: just length
-    if len(filtered) >= 4:
+    if correct_synonym:
+        # Fill up to 3 distractors (even if not synonyms)
+        while len(distractors) < 3 and len(candidate_words) > len(filtered):
+            # Try other candidates (different length)
+            for w in candidate_words:
+                if w not in distractors and w != correct_synonym:
+                    distractors.append(w)
+                if len(distractors) == 3:
+                    break
+        # Compose choices: correct answer always A
+        choices = [correct_synonym] + distractors[:3]
         letters = ['أ', 'ب', 'ج', 'د']
-        choices = [f"{letters[i]}) {filtered[i]}" for i in range(4)]
-        question = f"ما معنى كلمة \"{main_word}\"؟\n\n" + "\n".join(choices)
-        answer = choices[0]
-        msg = "لم يتم العثور على خيارات تحقق جميع الشروط (الوزن، عدد الحروف، والمعنى). تم توليد خيارات بنفس عدد الحروف فقط."
+        display_choices = [f"{letters[i]}) {choices[i]}" for i in range(len(choices))]
+        question = f"ما معنى كلمة \"{main_word}\"؟\n\n" + "\n".join(display_choices)
+        answer = display_choices[0]
+        if len(display_choices) < 4:
+            msg = "تم توليد أقل من 4 خيارات بسبب عدم توفر مشتتات كافية."
         return question, answer, msg
 
-    # 3. Relax length constraint: just semantic
-    semantically_related = []
-    for w in candidate_words:
-        if is_semantically_related(main_word, w, client):
-            semantically_related.append(w)
-        if len(semantically_related) == 4:
-            break
-    if len(semantically_related) == 4:
-        letters = ['أ', 'ب', 'ج', 'د']
-        choices = [f"{letters[i]}) {semantically_related[i]}" for i in range(4)]
-        question = f"ما معنى كلمة \"{main_word}\"؟\n\n" + "\n".join(choices)
-        answer = choices[0]
-        msg = "لم يتم العثور على خيارات تحقق جميع الشروط (الوزن وعدد الحروف). تم توليد خيارات متقاربة في المعنى فقط."
-        return question, answer, msg
-
-    # 4. Give up all constraints, just pick first 4
-    choices = []
-    for i, w in enumerate(candidate_words[:4]):
-        letters = ['أ', 'ب', 'ج', 'د']
-        choices.append(f"{letters[i]}) {w}")
-    question = f"ما معنى كلمة \"{main_word}\"؟\n\n" + "\n".join(choices)
-    answer = choices[0] if choices else ""
-    msg = "لم يتم العثور على خيارات تحقق أي من الشروط بشكل كامل. تم توليد أفضل خيارات ممكنة."
+    # 2. If no correct synonym, warn and use best distractors
+    choices = filtered[:4]
+    letters = ['أ', 'ب', 'ج', 'د']
+    display_choices = [f"{letters[i]}) {choices[i]}" for i in range(len(choices))]
+    question = f"ما معنى كلمة \"{main_word}\"؟\n\n" + "\n".join(display_choices)
+    answer = ""
+    msg = "تعذر إيجاد خيار صحيح مطابق للمعنى. تم توليد أفضل خيارات ممكنة فقط."
     return question, answer, msg
 
 def generate_meaning_test_llm(num_questions, reference_questions, grade):
