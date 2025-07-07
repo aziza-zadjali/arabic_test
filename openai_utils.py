@@ -268,15 +268,27 @@ CONTEXTUAL_PROMPT = """
 نلاحظ أن رمز الإجابة الصحيحة هو (أ) حيث أن كلمة (امتدّت) هي الأقرب معنى لكلمة (اشرأبت) في هذا السياق.
 """
 
-def extract_contextual_mcq_answer(gpt_output):
-    # Try to extract (أ|ب|ج|د) from various possible answer lines
-    match = re.search(r'رمز الإجابة الصحيحة (?:هو)?\s*[\:\(]?\s*([أ-د])[\)\s]*', gpt_output)
-    if match:
-        return match.group(1)
-    match2 = re.search(r'الإجابة الصحيحة\s*[:\(]?\s*([أ-د])[\)\s]*', gpt_output)
-    if match2:
-        return match2.group(1)
-    return "غير محدد"
+def extract_contextual_mcq_parts(gpt_output):
+    # Extract the main question block (up to first "نلاحظ" or end)
+    question_part = gpt_output.split('\n\nنلاحظ')[0] if '\n\nنلاحظ' in gpt_output else gpt_output
+
+    # Find the answer letter (أ|ب|ج|د) from any answer line
+    answer_letter = None
+    answer_line = None
+    for line in gpt_output.split('\n'):
+        line = line.strip()
+        match = re.search(r'رمز الإجابة الصحيحة(?: هو)?\s*[\:\(]?\s*([أ-د])[\)\s]*', line)
+        if match:
+            answer_letter = match.group(1)
+            answer_line = f"الإجابة الصحيحة: ({answer_letter})"
+            break
+        match2 = re.search(r'الإجابة الصحيحة\s*[:\(]?\s*([أ-د])[\)\s]*', line)
+        if match2:
+            answer_letter = match2.group(1)
+            answer_line = f"الإجابة الصحيحة: ({answer_letter})"
+            break
+
+    return question_part.strip(), answer_line
 
 def generate_mcq_contextual_word_meaning(reference_questions, grade):
     prompt = CONTEXTUAL_PROMPT + "\n\nيرجى توليد سؤال واحد فقط بالتنسيق أعلاه."
@@ -287,9 +299,8 @@ def generate_mcq_contextual_word_meaning(reference_questions, grade):
         max_tokens=400,
     )
     gpt_output = response.choices[0].message.content.strip()
-    question_part = gpt_output.split('\n\nنلاحظ')[0] if '\n\nنلاحظ' in gpt_output else gpt_output
-    answer = extract_contextual_mcq_answer(gpt_output)
-    return question_part.strip(), answer
+    question_part, answer_line = extract_contextual_mcq_parts(gpt_output)
+    return question_part, answer_line
 
 def generate_contextual_test_llm(num_questions, reference_questions, grade):
     questions = []
@@ -297,7 +308,7 @@ def generate_contextual_test_llm(num_questions, reference_questions, grade):
     attempts = 0
     while len(questions) < num_questions and attempts < max_attempts:
         attempts += 1
-        q, a = generate_mcq_contextual_word_meaning(reference_questions, grade)
-        if q and a and a != "غير محدد":
-            questions.append((q, a))
+        q, answer_line = generate_mcq_contextual_word_meaning(reference_questions, grade)
+        if q and answer_line:
+            questions.append((q, answer_line))
     return questions
