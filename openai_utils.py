@@ -4,6 +4,7 @@ from config import get_openai_api_key
 
 client = openai.OpenAI(api_key=get_openai_api_key())
 
+# Prompt for "معاني الكلمات" (unchanged)
 PROMPT_HEADER = """
 You are an expert in Arabic language assessment. Generate a pool of at least 10 Arabic words (not including the main word), all close in meaning to the main word, as possible distractors for an MCQ. 
 All generated words must have the same Arabic morphological pattern (وزن) as each other (e.g., all on وزن فعيل, or all on وزن مفاعل, etc.) and the same number of letters as each other. 
@@ -88,6 +89,40 @@ Examples (use this format exactly):
 دفع
 """
 
+# Prompt for "معنى الكلمة حسب السياق"
+CONTEXTUAL_PROMPT = """
+أنت خبير في إعداد أسئلة اللغة العربية. أنشئ سؤال اختيار من متعدد لمعنى كلمة في سياق جملة.
+يتكون كل سؤال من جملة تحتوي على كلمة تحتها خط، والمطلوب منك أن تستنتج المعنى الأقرب لتلك الكلمة من بين البدائل الأربعة المعطاة، بحيث إذا استخدم البديل الصحيح فإنه سيعطي المعنى نفسه للجملة.
+
+التعليمات:
+- الجملة يجب أن تحتوي على كلمة واحدة تحتها خط.
+- أعطِ أربعة خيارات للإجابة (أ، ب، ج، د).
+- خيار واحد فقط هو الصحيح (مرادف أو الأقرب معنى في السياق).
+- وضّح رمز الإجابة الصحيحة في نهاية السؤال.
+
+أمثلة:
+
+1. ما رمز الكلمة الصحيحة التي تعتبر الأقرب معنى للكلمة التي تحتها خط في الجملة الموجودة في رأس السؤال؟
+وَجَمَ الرجل بعد أن طُرد من عمله:
+أ‌- شرد
+ب- تعب
+ج- عبس
+د- سكت
+
+نلاحظ أن رمز الإجابة الصحيحة هو )ج( حيث أن كلمة )عبس( هي الأقرب معنى لكلمة )وَجَم(، وفي حالة استخدامها في الجملة كبديل لكلمة )وجم( فإنها تعطي المعنى الصحيح للجملة، أما بقية البدائل الأخرى فلا تدل على المعنى الصحيح.
+
+2. ما رمز الكلمة الصحيحة التي تعتبر الأقرب معنى للكلمة التي تحتها خط في الجملة الموجودة في رأس السؤال؟
+يحظى المواطن بالحرية في بلاده:
+أ‌- يدعو
+ب- يفرح
+ج- يحيى
+د- ينال
+
+نلاحظ أن رمز الإجابة الصحيحة هو )د( حيث أن كلمة )ينال( هي الأقرب معنى لكلمة )يحظى(، وفي حالة استخدامها في الجملة كبديل لكلمة )يحظى( فإنها تعطي المعنى الصحيح للجملة، أما بقية البدائل الأخرى فلا تدل على المعنى الصحيح.
+"""
+
+# --- Existing MCQ generation functions (unchanged) ---
+
 def filter_by_length(words):
     if not words:
         return []
@@ -158,13 +193,11 @@ def generate_mcq_arabic_word_meaning(main_word, reference_questions, grade):
     if correct_synonym:
         # Fill up to 3 distractors (even if not synonyms)
         while len(distractors) < 3 and len(candidate_words) > len(filtered):
-            # Try other candidates (different length)
             for w in candidate_words:
                 if w not in distractors and w != correct_synonym:
                     distractors.append(w)
                 if len(distractors) == 3:
                     break
-        # Compose choices: correct answer always A
         choices = [correct_synonym] + distractors[:3]
         letters = ['أ', 'ب', 'ج', 'د']
         display_choices = [f"{letters[i]}) {choices[i]}" for i in range(len(choices))]
@@ -180,10 +213,8 @@ def generate_mcq_arabic_word_meaning(main_word, reference_questions, grade):
 def generate_meaning_test_llm(num_questions, reference_questions, grade):
     questions = []
     used_words = set()
-    max_attempts = num_questions * 10  # Allow more attempts to find valid questions
+    max_attempts = num_questions * 10
     attempts = 0
-
-    # 1. Ask the LLM for a list of Arabic words relevant to the grade
     prompt = (
         f"اقترح قائمة من 15 كلمة عربية مناسبة لاختبار معاني الكلمات للصف {grade} "
         "يُفضل أن تكون الكلمات شائعة في مناهج هذا الصف، وليست أسماء أعلام أو كلمات تخصصية."
@@ -196,8 +227,6 @@ def generate_meaning_test_llm(num_questions, reference_questions, grade):
         max_tokens=100,
     )
     candidate_words = [w.strip() for w in response.choices[0].message.content.strip().split('\n') if w.strip()]
-    
-    # 2. For each candidate word, try to generate a valid MCQ
     for main_word in candidate_words:
         if len(questions) >= num_questions:
             break
@@ -205,7 +234,23 @@ def generate_meaning_test_llm(num_questions, reference_questions, grade):
             continue
         used_words.add(main_word)
         q, a, msg = generate_mcq_arabic_word_meaning(main_word, reference_questions, grade)
-        # Only accept questions where a correct answer (synonym/meaning) is found and no warning message
         if q and a and not msg:
             questions.append((q, a, msg))
     return questions
+
+# --- Contextual MCQ Generation (NEW) ---
+def generate_mcq_contextual_word_meaning(reference_questions, grade):
+    prompt = CONTEXTUAL_PROMPT + "\n\nيرجى توليد سؤال واحد فقط بالتنسيق أعلاه."
+    response = client.chat.completions.create(
+        model="gpt-4.1",
+        messages=[{"role": "user", "content": prompt}],
+        temperature=0.6,
+        max_tokens=400,
+    )
+    gpt_output = response.choices[0].message.content.strip()
+    # Extract question part (up to first "نلاحظ" or end)
+    question_part = gpt_output.split('\n\nنلاحظ')[0] if '\n\nنلاحظ' in gpt_output else gpt_output
+    # Extract correct answer letter
+    answer_match = re.search(r'رمز الإجابة الصحيحة هو ?\)?([أ-د])\)?', gpt_output)
+    answer = answer_match.group(1) if answer_match else "غير محدد"
+    return question_part.strip(), answer
