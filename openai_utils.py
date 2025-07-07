@@ -77,9 +77,17 @@ def extract_candidate_words(gpt_output, main_word):
     words = []
     for line in lines:
         word = line.strip().replace('-', '').replace('–', '').replace('—', '').strip()
-        if word and main_word not in word and len(word.split()) == 1:
+        # Exclude empty lines, main word, phrases, and headers like "الخيارات:"
+        if (
+            word and
+            main_word not in word and
+            len(word.split()) == 1 and
+            word != "الخيارات:" and
+            not word.startswith("الخيارات")
+        ):
             words.append(word)
     return words
+
 
 def generate_mcq_arabic_word_meaning(main_word, reference_questions, grade):
     prompt = f"""{PROMPT_HEADER}
