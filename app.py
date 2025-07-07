@@ -12,6 +12,10 @@ skills = {"الأسئلة اللفظية": "الأسئلة_اللفظية"}
 
 st.title("مولد أسئلة اللغة العربية")
 
+selected_grade = st.selectbox("اختر الصف الدراسي:", grades)
+selected_skill_label = st.selectbox("اختر المهارة:", list(skills.keys()))
+selected_skill_folder = skills[selected_skill_label]
+
 question_type = st.selectbox(
     "اختر نوع السؤال:",
     [
