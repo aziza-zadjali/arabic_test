@@ -73,11 +73,17 @@ elif question_type == "معنى الكلمة حسب السياق":
                 if num_questions == 1:
                     question, answer = generate_contextual_question(reference_questions, selected_grade)
                     st.markdown(question)
-                    st.success(f"الإجابة الصحيحة: {answer}")
+                    if answer != "غير محدد":
+                        st.success(f"الإجابة الصحيحة: {answer}")
+                    else:
+                        st.warning("تعذر تحديد الإجابة الصحيحة لهذا السؤال تلقائيًا.")
                 else:
                     test = generate_contextual_test(num_questions, reference_questions, selected_grade)
                     if not test:
                         st.error("تعذر توليد عدد كافٍ من الأسئلة السياقية. حاول مجددًا أو قلل العدد.")
                     for idx, (question, answer) in enumerate(test, 1):
                         st.markdown(f"**{idx}. {question}**")
-                        st.success(f"الإجابة الصحيحة: {answer}")
+                        if answer != "غير محدد":
+                            st.success(f"الإجابة الصحيحة: {answer}")
+                        else:
+                            st.warning("تعذر تحديد الإجابة الصحيحة لهذا السؤال تلقائيًا.")
