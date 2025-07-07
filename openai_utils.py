@@ -132,10 +132,7 @@ def has_al(word):
 def ensure_al(words):
     return [w if w.startswith("ال") else "ال" + w for w in words]
 
-def ensure_al_in_choices_contextual(choices, underlined_word):
-    # Only add "ال" if the underlined word itself starts with "ال"
-    if not underlined_word or not has_al(underlined_word):
-        return choices
+def ensure_al_in_choices(choices):
     ensured = []
     for c in choices:
         m = re.match(r'^([أ-د][\)\-]?)\s*(.+)', c)
@@ -205,7 +202,6 @@ def generate_mcq_arabic_word_meaning(main_word, reference_questions, grade):
     gpt_output = response.choices[0].message.content.strip()
     choices, correct = extract_mcq_choices_and_answer(gpt_output, main_word)
 
-    # Enforce "ال" if main word has it
     if has_al(main_word):
         choices = [(label, word if word.startswith("ال") else "ال" + word) for label, word in choices]
         if correct and not correct.split(")", 1)[-1].strip().startswith("ال"):
@@ -228,7 +224,7 @@ def generate_mcq_arabic_word_meaning(main_word, reference_questions, grade):
             letters = ['أ', 'ب', 'ج', 'د']
             display_choices = [f"{letters[i]}) {w}" for i, w in enumerate([correct_synonym] + distractors[:3])]
             if has_al(main_word):
-                display_choices = ensure_al_in_choices_contextual(display_choices, main_word)
+                display_choices = ensure_al_in_choices(display_choices)
             question = f"ما معنى كلمة \"{main_word}\"؟\n\n" + "\n".join(display_choices)
             answer = display_choices[0]
             return question, answer, None
@@ -289,12 +285,10 @@ def extract_contextual_mcq_parts(gpt_output):
     return question_part.strip(), answer_line
 
 def extract_underlined_word(question_text):
+    # Try to find underlined word using underscores, or fallback to nothing
     match = re.search(r'_(\w+)_', question_text)
     if match:
         return match.group(1)
-    for word in question_text.split():
-        if word.startswith("ال"):
-            return word
     return None
 
 def enforce_al_in_context_choices(choices, underlined_word):
@@ -347,7 +341,7 @@ def generate_mcq_contextual_word_meaning(reference_questions, grade):
                 filtered_choices.append(c)
         else:
             filtered_choices.append(c)
-    # Only enforce "ال" if underlined word has it
+    # Only enforce "ال" if underlined word has it (and underlined_word is not None)
     filtered_choices = enforce_al_in_context_choices(filtered_choices, underlined_word)
     # Rebuild question_part with filtered choices
     question_lines = [l for l in lines if not re.match(r'^([أ-د][\)\-]?)\s*(.+)', l.strip())]
