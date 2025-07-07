@@ -3,7 +3,8 @@ from reference_loader import load_reference_questions
 from question_generator import (
     create_question,
     generate_meaning_test,
-    generate_contextual_question
+    generate_contextual_question,
+    generate_contextual_test
 )
 
 grades = ["الصف السابع والثامن"]
@@ -61,13 +62,22 @@ elif question_type == "اختبار معاني الكلمات (تلقائي)":
                     st.success(f"الإجابة الصحيحة: {answer}")
 
 elif question_type == "معنى الكلمة حسب السياق":
-    if st.button("توليد سؤال"):
+    num_questions = st.slider("عدد الأسئلة في الاختبار", 1, 5, 1)
+    if st.button("توليد سؤال/اختبار"):
         with st.spinner("يتم توليد السؤال..."):
             grade_folder = "الصف_السابع_والثامن"
             reference_questions = load_reference_questions(grade_folder, selected_skill_folder)
             if not reference_questions:
                 st.error("لا توجد أسئلة مرجعية في هذه المرحلة/المهارة. تأكد من وجود الملفات في المسار الصحيح.")
             else:
-                question, answer = generate_contextual_question(reference_questions, selected_grade)
-                st.markdown(question)
-                st.success(f"الإجابة الصحيحة: {answer}")
+                if num_questions == 1:
+                    question, answer = generate_contextual_question(reference_questions, selected_grade)
+                    st.markdown(question)
+                    st.success(f"الإجابة الصحيحة: {answer}")
+                else:
+                    test = generate_contextual_test(num_questions, reference_questions, selected_grade)
+                    if not test:
+                        st.error("تعذر توليد عدد كافٍ من الأسئلة السياقية. حاول مجددًا أو قلل العدد.")
+                    for idx, (question, answer) in enumerate(test, 1):
+                        st.markdown(f"**{idx}. {question}**")
+                        st.success(f"الإجابة الصحيحة: {answer}")
