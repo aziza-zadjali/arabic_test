@@ -89,6 +89,91 @@ Examples (use this format exactly):
 دفع
 """
 
+# --- Contextual Word Meaning MCQ (معنى الكلمة حسب السياق) ---
+CONTEXTUAL_PROMPT = """
+أنت خبير في إعداد أسئلة اللغة العربية. أنشئ سؤال اختيار من متعدد لمعنى كلمة في سياق جملة.
+يتكون كل سؤال من جملة تحتوي على كلمة تحتها خط، والمطلوب منك أن تستنتج المعنى الأقرب لتلك الكلمة من بين البدائل الأربعة المعطاة، بحيث إذا استخدم البديل الصحيح فإنه سيعطي المعنى نفسه للجملة.
+
+التعليمات:
+- الجملة يجب أن تحتوي على كلمة واحدة تحتها خط.
+- أعطِ أربعة خيارات للإجابة (أ، ب، ج، د).
+- خيار واحد فقط هو الصحيح (مرادف أو الأقرب معنى في السياق).
+- وضّح رمز الإجابة الصحيحة في نهاية السؤال.
+
+أمثلة:
+1. ما رمز الكلمة الصحيحة التي تعتبر الأقرب معنى للكلمة التي تحتها خط في الجملة الموجودة في رأس السؤال؟
+وَجَمَ الرجل بعد أن طُرد من عمله:
+أ- شرد
+ب- تعب
+ج- عبس
+د- سكت
+
+نلاحظ أن رمز الإجابة الصحيحة هو (ج) حيث أن كلمة (عبس) هي الأقرب معنى لكلمة (وَجَم)، وفي حالة استخدامها في الجملة كبديل لكلمة (وجم) فإنها تعطي المعنى الصحيح للجملة، أما بقية البدائل الأخرى فلا تدل على المعنى الصحيح.
+
+2. ما رمز الكلمة الصحيحة التي تعتبر الأقرب معنى للكلمة التي تحتها خط في الجملة الموجودة في رأس السؤال؟
+يحظى المواطن بالحرية في بلاده:
+أ- يدعو
+ب- يفرح
+ج- يحيى
+د- ينال
+
+نلاحظ أن رمز الإجابة الصحيحة هو (د) حيث أن كلمة (ينال) هي الأقرب معنى لكلمة (يحظى)، وفي حالة استخدامها في الجملة كبديل لكلمة (يحظى) فإنها تعطي المعنى الصحيح للجملة، أما بقية البدائل الأخرى فلا تدل على المعنى الصحيح.
+
+3. بهرَ فلانٌ نظراءهُ:
+أ- سادَ
+ب- قادَ
+ج- فاقَ
+د- لامَ
+
+نلاحظ أن رمز الإجابة الصحيحة هو (ج) حيث أن كلمة (فاقَ) هي الأقرب معنى لكلمة (بهرَ) في هذا السياق.
+
+4. "والليل إذا عسعس":
+أ- طال
+ب- أظلم
+ج- قصر
+د- أمطر
+
+نلاحظ أن رمز الإجابة الصحيحة هو (ب) حيث أن كلمة (أظلم) هي الأقرب معنى لكلمة (عسعس) في هذا السياق.
+
+5. انبثق الماء غزيرا:
+أ- انحصر
+ب- انتشر
+ج- انقطع
+د- اندفع
+
+نلاحظ أن رمز الإجابة الصحيحة هو (د) حيث أن كلمة (اندفع) هي الأقرب معنى لكلمة (انبثق) في هذا السياق.
+
+6. اشرأبت الزرافات بأعناقها:
+أ- امتدّت
+ب- اشتدّت
+ج- قصرت
+د- ابتهجت
+
+نلاحظ أن رمز الإجابة الصحيحة هو (أ) حيث أن كلمة (امتدّت) هي الأقرب معنى لكلمة (اشرأبت) في هذا السياق.
+"""
+
+# --- Utility functions for "ال" enforcement ---
+def has_al(word):
+    return word.strip().startswith("ال")
+
+def ensure_al(words):
+    return [w if w.startswith("ال") else "ال" + w for w in words]
+
+def ensure_al_in_choices(choices):
+    # choices in format: "أ) كلمة"
+    ensured = []
+    for c in choices:
+        m = re.match(r'^([أ-د][\)\-]?)\s*(.+)', c)
+        if m:
+            label, word = m.group(1), m.group(2)
+            if not word.startswith("ال"):
+                word = "ال" + word
+            ensured.append(f"{label} {word}")
+        else:
+            ensured.append(c)
+    return ensured
+
+# --- Word Meaning MCQ (معاني الكلمات) ---
 def filter_by_length(words):
     if not words:
         return []
@@ -146,6 +231,10 @@ def generate_mcq_arabic_word_meaning(main_word, reference_questions, grade):
     candidate_words = extract_candidate_words(gpt_output, main_word)
     filtered = filter_by_length(candidate_words)
 
+    # Enforce "ال" if main word has it
+    if has_al(main_word):
+        filtered = ensure_al(filtered)
+
     # 1. Find at least one correct synonym/meaning match
     correct_synonym = None
     distractors = []
@@ -167,6 +256,9 @@ def generate_mcq_arabic_word_meaning(main_word, reference_questions, grade):
         choices = [correct_synonym] + distractors[:3]
         letters = ['أ', 'ب', 'ج', 'د']
         display_choices = [f"{letters[i]}) {choices[i]}" for i in range(len(choices))]
+        # Enforce "ال" in choices as well
+        if has_al(main_word):
+            display_choices = ensure_al_in_choices(display_choices)
         question = f"ما معنى كلمة \"{main_word}\"؟\n\n" + "\n".join(display_choices)
         answer = display_choices[0]
         if len(display_choices) < 4:
@@ -205,69 +297,6 @@ def generate_meaning_test_llm(num_questions, reference_questions, grade):
     return questions
 
 # --- Contextual Word Meaning MCQ (معنى الكلمة حسب السياق) ---
-CONTEXTUAL_PROMPT = """
-أنت خبير في إعداد أسئلة اللغة العربية. أنشئ سؤال اختيار من متعدد لمعنى كلمة في سياق جملة.
-يتكون كل سؤال من جملة تحتوي على كلمة تحتها خط، والمطلوب منك أن تستنتج المعنى الأقرب لتلك الكلمة من بين البدائل الأربعة المعطاة، بحيث إذا استخدم البديل الصحيح فإنه سيعطي المعنى نفسه للجملة.
-
-التعليمات:
-- الجملة يجب أن تحتوي على كلمة واحدة تحتها خط.
-- أعطِ أربعة خيارات للإجابة (أ، ب، ج، د).
-- خيار واحد فقط هو الصحيح (مرادف أو الأقرب معنى في السياق).
-- وضّح رمز الإجابة الصحيحة في نهاية السؤال.
-
-أمثلة:
-
-1. ما رمز الكلمة الصحيحة التي تعتبر الأقرب معنى للكلمة التي تحتها خط في الجملة الموجودة في رأس السؤال؟
-وَجَمَ الرجل بعد أن طُرد من عمله:
-أ- شرد
-ب- تعب
-ج- عبس
-د- سكت
-
-نلاحظ أن رمز الإجابة الصحيحة هو (ج) حيث أن كلمة (عبس) هي الأقرب معنى لكلمة (وَجَم)، وفي حالة استخدامها في الجملة كبديل لكلمة (وجم) فإنها تعطي المعنى الصحيح للجملة، أما بقية البدائل الأخرى فلا تدل على المعنى الصحيح.
-
-2. ما رمز الكلمة الصحيحة التي تعتبر الأقرب معنى للكلمة التي تحتها خط في الجملة الموجودة في رأس السؤال؟
-يحظى المواطن بالحرية في بلاده:
-أ- يدعو
-ب- يفرح
-ج- يحيى
-د- ينال
-
-نلاحظ أن رمز الإجابة الصحيحة هو (د) حيث أن كلمة (ينال) هي الأقرب معنى لكلمة (يحظى)، وفي حالة استخدامها في الجملة كبديل لكلمة (يحظى) فإنها تعطي المعنى الصحيح للجملة، أما بقية البدائل الأخرى فلا تدل على المعنى الصحيح.
-
-3. بهرَ فلانٌ نظراءهُ:
-أ- سادَ
-ب- قادَ
-ج- فاقَ
-د- لامَ
-
-نلاحظ أن رمز الإجابة الصحيحة هو (ج) حيث أن كلمة (فاقَ) هي الأقرب معنى لكلمة (بهرَ) في هذا السياق.
-
-4. "والليل إذا عسعس":
-أ- طال
-ب- أظلم
-ج- قصر
-د- أمطر
-
-نلاحظ أن رمز الإجابة الصحيحة هو (ب) حيث أن كلمة (أظلم) هي الأقرب معنى لكلمة (عسعس) في هذا السياق.
-
-5. انبثق الماء غزيرا:
-أ- انحصر
-ب- انتشر
-ج- انقطع
-د- اندفع
-
-نلاحظ أن رمز الإجابة الصحيحة هو (د) حيث أن كلمة (اندفع) هي الأقرب معنى لكلمة (انبثق) في هذا السياق.
-
-6. اشرأبت الزرافات بأعناقها:
-أ- امتدّت
-ب- اشتدّت
-ج- قصرت
-د- ابتهجت
-
-نلاحظ أن رمز الإجابة الصحيحة هو (أ) حيث أن كلمة (امتدّت) هي الأقرب معنى لكلمة (اشرأبت) في هذا السياق.
-"""
-
 def extract_contextual_mcq_parts(gpt_output):
     # Extract the main question block (up to first "نلاحظ" or end)
     question_part = gpt_output.split('\n\nنلاحظ')[0] if '\n\nنلاحظ' in gpt_output else gpt_output
@@ -288,7 +317,34 @@ def extract_contextual_mcq_parts(gpt_output):
             answer_line = f"الإجابة الصحيحة: ({answer_letter})"
             break
 
+    # Enforce "ال" in choices if underlined word has "ال"
+    underlined_word = extract_underlined_word(question_part)
+    if underlined_word and has_al(underlined_word):
+        question_part = enforce_al_in_context_choices(question_part)
+
     return question_part.strip(), answer_line
+
+def extract_underlined_word(question_text):
+    # Try to find a word between underscores or with <u>...</u> or similar
+    match = re.search(r'_(\w+)_', question_text)
+    if match:
+        return match.group(1)
+    # Fallback: find the first word with "ال" in the question
+    for word in question_text.split():
+        if word.startswith("ال"):
+            return word
+    return None
+
+def enforce_al_in_context_choices(question_text):
+    # Replace all choices (أ|ب|ج|د)- كلمة with (أ|ب|ج|د)- الكلمة (if not already)
+    def repl(m):
+        label = m.group(1)
+        word = m.group(2)
+        if not word.startswith("ال"):
+            word = "ال" + word
+        return f"{label}- {word}"
+    # Arabic dash or parenthesis formats
+    return re.sub(r'([أ-د][\)\-]?)\s*([^\n]+)', repl, question_text)
 
 def generate_mcq_contextual_word_meaning(reference_questions, grade):
     prompt = CONTEXTUAL_PROMPT + "\n\nيرجى توليد سؤال واحد فقط بالتنسيق أعلاه."
