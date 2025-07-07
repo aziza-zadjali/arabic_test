@@ -5,7 +5,9 @@ from config import get_openai_api_key
 client = openai.OpenAI(api_key=get_openai_api_key())
 
 PROMPT_HEADER = """
-You are an expert in Arabic language assessment. Generate a pool of at least 10 Arabic words (not including the main word), all close in meaning to the main word, as possible distractors for an MCQ. The words should be in a list, each on a new line, and should be single words (not phrases).
+You are an expert in Arabic language assessment. Generate a pool of at least 10 Arabic words (not including the main word), all close in meaning to the main word, as possible distractors for an MCQ. 
+All generated words must have the same Arabic morphological pattern (وزن) as each other (e.g., all on وزن فعيل, or all on وزن مفاعل, etc.) and the same number of letters as each other. 
+List the pattern (وزن) you used, then list the words (each on a new line, no phrases).
 
 Instructions:
 - Do NOT include the main word itself.
@@ -13,21 +15,42 @@ Instructions:
 - Do not repeat words.
 - Do not include words with the same root as the main word.
 
-Examples (use this format exactly):
+Examples:
 
-الكلمة الرئيسية: "ترويج"
-الخيارات:
+وزن: تفعيل
+كلمات:
 تسويق
 تغليف
 تنفيذ
 ترحيل
 
-الكلمة الرئيسية: "مآثر"
-الخيارات:
-مساكن
+وزن: مفاعل
+كلمات:
+مآثر
 مداخل
 مراجع
 محاسن
+
+وزن: فعيل
+كلمات:
+قديم
+جميل
+أصيل
+أثري
+
+وزن: فعول
+كلمات:
+رسول
+صبور
+شكور
+حقود
+
+وزن: مفعول
+كلمات:
+محسود
+مشكور
+مرفوع
+مكتوب
 
 الكلمة الرئيسية: "الدجى"
 الخيارات:
@@ -73,27 +96,50 @@ def filter_by_length(words):
     return filtered if len(filtered) >= 4 else words[:4]
 
 def extract_candidate_words(gpt_output, main_word):
+    # Extract words after the pattern header if present
     lines = gpt_output.strip().split('\n')
     words = []
+    collecting = False
     for line in lines:
-        word = line.strip().replace('-', '').replace('–', '').replace('—', '').strip()
-        # Exclude empty lines, main word, phrases, and headers like "الخيارات:"
-        if (
-            word and
-            main_word not in word and
-            len(word.split()) == 1 and
-            word != "الخيارات:" and
-            not word.startswith("الخيارات")
-        ):
-            words.append(word)
+        l = line.strip()
+        # Start collecting after "كلمات:" or after "الخيارات:"
+        if l.startswith("كلمات:") or l.startswith("الخيارات:"):
+            collecting = True
+            continue
+        # Stop collecting if a new pattern/weight appears
+        if l.startswith("وزن:"):
+            collecting = False
+            continue
+        if collecting:
+            word = l.replace('-', '').replace('–', '').replace('—', '').strip()
+            if (
+                word and
+                main_word not in word and
+                len(word.split()) == 1 and
+                word != "الخيارات:" and
+                not word.startswith("الخيارات")
+            ):
+                words.append(word)
+    # Fallback: if nothing collected, try all single-word lines not matching headers
+    if not words:
+        for line in lines:
+            word = line.strip().replace('-', '').replace('–', '').replace('—', '').strip()
+            if (
+                word and
+                main_word not in word and
+                len(word.split()) == 1 and
+                word != "الخيارات:" and
+                not word.startswith("الخيارات") and
+                not word.startswith("وزن:")
+            ):
+                words.append(word)
     return words
-
 
 def generate_mcq_arabic_word_meaning(main_word, reference_questions, grade):
     prompt = f"""{PROMPT_HEADER}
 الكلمة الرئيسية: "{main_word}"
 الأسئلة المرجعية: {reference_questions[:3]}
-اقترح 10 كلمات، كل كلمة في سطر، قريبة في المعنى من "{main_word}".
+اكتب وزن الكلمات التي ستستخدمها، ثم قائمة بـ10 كلمات، كل كلمة في سطر، قريبة في المعنى من "{main_word}"، وجميعها على نفس الوزن وعدد الحروف.
 """
     response = client.chat.completions.create(
         model="gpt-4.1",
@@ -105,7 +151,7 @@ def generate_mcq_arabic_word_meaning(main_word, reference_questions, grade):
     candidate_words = extract_candidate_words(gpt_output, main_word)
     filtered = filter_by_length(candidate_words)
     if len(filtered) < 4:
-        return ("تعذر توليد خيارات متوافقة في عدد الحروف. حاول بكلمة أخرى.", "")
+        return ("تعذر توليد خيارات متوافقة في عدد الحروف ووزن الكلمة. حاول بكلمة أخرى.", "")
     letters = ['أ', 'ب', 'ج', 'د']
     choices = [f"{letters[i]}) {filtered[i]}" for i in range(4)]
     question = f"ما معنى كلمة \"{main_word}\"؟\n\n" + "\n".join(choices)
