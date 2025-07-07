@@ -88,7 +88,7 @@ def generate_mcq_arabic_word_meaning(main_word, reference_questions, grade):
 اقترح 10 كلمات، كل كلمة في سطر، قريبة في المعنى من "{main_word}".
 """
     response = client.chat.completions.create(
-        model="gpt-3.5-turbo",
+        model="gpt-4.1",
         messages=[{"role": "user", "content": prompt}],
         temperature=0.6,
         max_tokens=400,
@@ -110,7 +110,7 @@ def generate_meaning_test_llm(num_questions, reference_questions, grade):
     for _ in range(num_questions):
         prompt = "Suggest a single, exam-appropriate Arabic word (not a phrase) for a vocabulary MCQ for grade 7/8. Do not repeat previous words."
         response = client.chat.completions.create(
-            model="gpt-3.5-turbo",
+            model="gpt-4.1",
             messages=[{"role": "user", "content": prompt}],
             temperature=0.7,
             max_tokens=20,
