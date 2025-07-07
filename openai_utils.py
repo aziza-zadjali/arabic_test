@@ -143,24 +143,55 @@ def generate_mcq_arabic_word_meaning(main_word, reference_questions, grade):
     )
     gpt_output = response.choices[0].message.content.strip()
     candidate_words = extract_candidate_words(gpt_output, main_word)
+
+    # 1. Try all constraints: length + semantic
     filtered = filter_by_length(candidate_words)
-    
-    # Semantic filtering using the LLM itself
     semantically_related = []
     for w in filtered:
         if is_semantically_related(main_word, w, client):
             semantically_related.append(w)
         if len(semantically_related) == 4:
             break
+    if len(semantically_related) == 4:
+        letters = ['أ', 'ب', 'ج', 'د']
+        choices = [f"{letters[i]}) {semantically_related[i]}" for i in range(4)]
+        question = f"ما معنى كلمة \"{main_word}\"؟\n\n" + "\n".join(choices)
+        answer = choices[0]
+        return question, answer, None
 
-    if len(semantically_related) < 4:
-        return ("تعذر توليد خيارات متوافقة في الوزن والحروف والمعنى. حاول بكلمة أخرى.", "")
+    # 2. Relax semantic constraint: just length
+    if len(filtered) >= 4:
+        letters = ['أ', 'ب', 'ج', 'د']
+        choices = [f"{letters[i]}) {filtered[i]}" for i in range(4)]
+        question = f"ما معنى كلمة \"{main_word}\"؟\n\n" + "\n".join(choices)
+        answer = choices[0]
+        msg = "لم يتم العثور على خيارات تحقق جميع الشروط (الوزن، عدد الحروف، والمعنى). تم توليد خيارات بنفس عدد الحروف فقط."
+        return question, answer, msg
 
-    letters = ['أ', 'ب', 'ج', 'د']
-    choices = [f"{letters[i]}) {semantically_related[i]}" for i in range(4)]
+    # 3. Relax length constraint: just semantic
+    semantically_related = []
+    for w in candidate_words:
+        if is_semantically_related(main_word, w, client):
+            semantically_related.append(w)
+        if len(semantically_related) == 4:
+            break
+    if len(semantically_related) == 4:
+        letters = ['أ', 'ب', 'ج', 'د']
+        choices = [f"{letters[i]}) {semantically_related[i]}" for i in range(4)]
+        question = f"ما معنى كلمة \"{main_word}\"؟\n\n" + "\n".join(choices)
+        answer = choices[0]
+        msg = "لم يتم العثور على خيارات تحقق جميع الشروط (الوزن وعدد الحروف). تم توليد خيارات متقاربة في المعنى فقط."
+        return question, answer, msg
+
+    # 4. Give up all constraints, just pick first 4
+    choices = []
+    for i, w in enumerate(candidate_words[:4]):
+        letters = ['أ', 'ب', 'ج', 'د']
+        choices.append(f"{letters[i]}) {w}")
     question = f"ما معنى كلمة \"{main_word}\"؟\n\n" + "\n".join(choices)
-    answer = choices[0]
-    return question, answer
+    answer = choices[0] if choices else ""
+    msg = "لم يتم العثور على خيارات تحقق أي من الشروط بشكل كامل. تم توليد أفضل خيارات ممكنة."
+    return question, answer, msg
 
 def generate_meaning_test_llm(num_questions, reference_questions, grade):
     questions = []
@@ -177,6 +208,4 @@ def generate_meaning_test_llm(num_questions, reference_questions, grade):
         if main_word in used_words:
             continue
         used_words.add(main_word)
-        q, a = generate_mcq_arabic_word_meaning(main_word, reference_questions, grade)
-        questions.append((q, a))
-    return questions
+        q, a, msg = generate_mcq_arabic_word_meaning(main_word
