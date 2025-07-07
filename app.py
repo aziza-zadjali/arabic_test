@@ -44,6 +44,8 @@ else:
                 st.error("لا توجد أسئلة مرجعية في هذه المرحلة/المهارة. تأكد من وجود الملفات في المسار الصحيح.")
             else:
                 test = generate_meaning_test(num_questions, reference_questions, selected_grade)
+                if not test:
+                    st.error("تعذر توليد عدد كافٍ من الأسئلة بمعنى صحيح. حاول مجددًا أو قلل عدد الأسئلة.")
                 for idx, (question, answer, msg) in enumerate(test, 1):
                     if msg:
                         st.warning(f"سؤال {idx}: {msg}")
