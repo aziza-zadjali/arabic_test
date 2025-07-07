@@ -4,7 +4,6 @@ from question_generator import create_question, generate_meaning_test
 
 grades = ["الصف السابع والثامن"]
 skills = {"الأسئلة اللفظية": "الأسئلة_اللفظية"}
-question_types = ["معنى الكلمة"]
 
 st.title("مولد أسئلة معاني الكلمات")
 st.write("اختر أحد الخيارين: توليد سؤال لمعنى كلمة، أو توليد اختبار معاني كلمات كامل.")
