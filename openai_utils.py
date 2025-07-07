@@ -174,19 +174,16 @@ def generate_mcq_arabic_word_meaning(main_word, reference_questions, grade):
             msg = "تم توليد أقل من 4 خيارات بسبب عدم توفر مشتتات كافية."
         return question, answer, msg
 
-    # 2. If no correct synonym, warn and use best distractors
-    choices = filtered[:4]
-    letters = ['أ', 'ب', 'ج', 'د']
-    display_choices = [f"{letters[i]}) {choices[i]}" for i in range(len(choices))]
-    question = f"ما معنى كلمة \"{main_word}\"؟\n\n" + "\n".join(display_choices)
-    answer = ""
-    msg = "تعذر إيجاد خيار صحيح مطابق للمعنى. تم توليد أفضل خيارات ممكنة فقط."
-    return question, answer, msg
+    # 2. If no correct synonym, return empty answer (will be skipped in test mode)
+    return None, None, None
 
 def generate_meaning_test_llm(num_questions, reference_questions, grade):
     questions = []
     used_words = set()
-    for _ in range(num_questions):
+    max_attempts = num_questions * 7  # Avoid infinite loops
+    attempts = 0
+    while len(questions) < num_questions and attempts < max_attempts:
+        attempts += 1
         prompt = "Suggest a single, exam-appropriate Arabic word (not a phrase) for a vocabulary MCQ for grade 7/8. Do not repeat previous words."
         response = client.chat.completions.create(
             model="gpt-4.1",
@@ -199,5 +196,6 @@ def generate_meaning_test_llm(num_questions, reference_questions, grade):
             continue
         used_words.add(main_word)
         q, a, msg = generate_mcq_arabic_word_meaning(main_word, reference_questions, grade)
-        questions.append((q, a, msg))
+        if q and a:
+            questions.append((q, a, msg))
     return questions
