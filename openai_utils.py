@@ -4,126 +4,46 @@ from config import get_openai_api_key
 
 client = openai.OpenAI(api_key=get_openai_api_key())
 
-# --- Word Meaning MCQ (معاني الكلمات) ---
 PROMPT_HEADER = """
-You are an expert in Arabic language assessment. Generate a pool of at least 10 Arabic words (not including the main word), all close in meaning to the main word, as possible distractors for an MCQ.
+You are an expert in Arabic language assessment. For the given main word, generate a multiple-choice question (MCQ) with four choices.
 
 Instructions:
+- Only one choice should be the closest in meaning (a true synonym or the best possible equivalent) to the main word; the other three must be plausible distractors (semantically related but not synonyms).
 - Do NOT include the main word itself.
-- All words must be close in meaning (synonyms or semantically related).
 - Do not repeat words.
 - Do not include words with the same root as the main word.
-- Preferably, all generated choices should have the same Arabic morphological pattern (وزن) and the same number of letters as each other (e.g., all on وزن فعيل, or all on وزن مفاعل, etc.), but if this is not possible, you may relax this constraint and provide the best set of distractors you can.
-- List the pattern (وزن) you used (if any), then list the words (each on a new line, no phrases).
+- Preferably, all choices should have the same Arabic morphological pattern (وزن) and the same number of letters as each other (e.g., all on وزن فعيل, or all on وزن مفاعل, etc.), but if this is not possible, relax this constraint and provide the best set of distractors you can.
+- List the pattern (وزن) you used (if any), then show the four choices (each on a new line, no phrases).
+- Clearly indicate the correct answer.
 
 Examples (use this format exactly):
 
-وزن: تفعيل
-كلمات:
-تسويق
-تغليف
-تنفيذ
-ترحيل
+الكلمة الرئيسية: "الدجى"
+الخيارات:
+أ) الظلام
+ب) الشفق
+ج) النور
+د) الأصيل
 
-وزن: مفاعل
-كلمات:
-مآثر
-مداخل
-مراجع
-محاسن
+الإجابة الصحيحة: أ) الظلام
 
 الكلمة الرئيسية: "الأصل"
 الخيارات:
-الصباح
-السحر
-الغروب
-الظهيرة
+أ) الصباح
+ب) السحر
+ج) الغروب
+د) الظهيرة
 
-الكلمة الرئيسية: "الدجى"
-الخيارات:
-الأصيل
-الظلام
-الشفق
-النور
+الإجابة الصحيحة: ب) السحر
 
 الكلمة الرئيسية: "الخضوع"
 الخيارات:
-الجحود
-القعود
-الركوع
-الخشوع
+أ) الركوع
+ب) الجحود
+ج) القعود
+د) الخشوع
 
-الكلمة الرئيسية: "برع"
-الخيارات:
-فاق
-رام
-نام
-خاف
-"""
-
-# --- Contextual Word Meaning MCQ (معنى الكلمة حسب السياق) ---
-CONTEXTUAL_PROMPT = """
-أنت خبير في إعداد أسئلة اللغة العربية. أنشئ سؤال اختيار من متعدد لمعنى كلمة في سياق جملة.
-يتكون كل سؤال من جملة تحتوي على كلمة تحتها خط، والمطلوب منك أن تستنتج المعنى الأقرب لتلك الكلمة من بين البدائل الأربعة المعطاة، بحيث إذا استخدم البديل الصحيح فإنه سيعطي المعنى نفسه للجملة.
-
-التعليمات:
-- الجملة يجب أن تحتوي على كلمة واحدة تحتها خط.
-- أعطِ أربعة خيارات للإجابة (أ، ب، ج، د).
-- خيار واحد فقط هو الصحيح (مرادف أو الأقرب معنى في السياق).
-- وضّح رمز الإجابة الصحيحة في نهاية السؤال.
-- يُفضّل أن تكون جميع البدائل على نفس الوزن وعدد الحروف بعضها مع بعض (لكن ليس بالضرورة نفس الكلمة الرئيسية أو الكلمة التي تحتها خط). إذا لم يكن ذلك ممكنًا، يمكنك تخفيف هذا الشرط وتقديم أفضل مجموعة متاحة من البدائل.
-- لا تدرج كلمات تشترك في الجذر مع الكلمة التي تحتها خط.
-
-أمثلة:
-1. ما رمز الكلمة الصحيحة التي تعتبر الأقرب معنى للكلمة التي تحتها خط في الجملة الموجودة في رأس السؤال؟
-وَجَمَ الرجل بعد أن طُرد من عمله:
-أ- شرد
-ب- تعب
-ج- عبس
-د- سكت
-
-نلاحظ أن رمز الإجابة الصحيحة هو (ج) حيث أن كلمة (عبس) هي الأقرب معنى لكلمة (وَجَم)، وفي حالة استخدامها في الجملة كبديل لكلمة (وجم) فإنها تعطي المعنى الصحيح للجملة، أما بقية البدائل الأخرى فلا تدل على المعنى الصحيح.
-
-2. ما رمز الكلمة الصحيحة التي تعتبر الأقرب معنى للكلمة التي تحتها خط في الجملة الموجودة في رأس السؤال؟
-يحظى المواطن بالحرية في بلاده:
-أ- يدعو
-ب- يفرح
-ج- يحيى
-د- ينال
-
-نلاحظ أن رمز الإجابة الصحيحة هو (د) حيث أن كلمة (ينال) هي الأقرب معنى لكلمة (يحظى)، وفي حالة استخدامها في الجملة كبديل لكلمة (يحظى) فإنها تعطي المعنى الصحيح للجملة، أما بقية البدائل الأخرى فلا تدل على المعنى الصحيح.
-
-3. بهرَ فلانٌ نظراءهُ:
-أ- سادَ
-ب- قادَ
-ج- فاقَ
-د- لامَ
-
-نلاحظ أن رمز الإجابة الصحيحة هو (ج) حيث أن كلمة (فاقَ) هي الأقرب معنى لكلمة (بهرَ) في هذا السياق.
-
-4. "والليل إذا عسعس":
-أ- طال
-ب- أظلم
-ج- قصر
-د- أمطر
-
-نلاحظ أن رمز الإجابة الصحيحة هو (ب) حيث أن كلمة (أظلم) هي الأقرب معنى لكلمة (عسعس) في هذا السياق.
-
-5. انبثق الماء غزيرا:
-أ- انحصر
-ب- انتشر
-ج- انقطع
-د- اندفع
-
-نلاحظ أن رمز الإجابة الصحيحة هو (د) حيث أن كلمة (اندفع) هي الأقرب معنى لكلمة (انبثق) في هذا السياق.
-
-6. اشرأبت الزرافات بأعناقها:
-أ- امتدّت
-ب- اشتدّت
-ج- قصرت
-د- ابتهجت
-
-نلاحظ أن رمز الإجابة الصحيحة هو (أ) حيث أن كلمة (امتدّت) هي الأقرب معنى لكلمة (اشرأبت) في هذا السياق.
+الإجابة الصحيحة: أ) الركوع
 """
 
 def has_al(word):
@@ -155,31 +75,13 @@ def filter_by_length(words):
     filtered = [w for w in words if len(w) == target_len]
     return filtered if len(filtered) >= 4 else words[:4]
 
-def extract_candidate_words(gpt_output, main_word):
-    lines = gpt_output.strip().split('\n')
-    words = []
-    collecting = False
-    for line in lines:
-        l = line.strip()
-        if l.startswith("كلمات:") or l.startswith("الخيارات:"):
-            collecting = True
-            continue
-        if l.startswith("وزن:"):
-            collecting = False
-            continue
-        if collecting:
-            word = l.replace('-', '').replace('–', '').replace('—', '').strip()
-            if word and main_word not in word and len(word.split()) == 1 and word != "الخيارات:":
-                words.append(word)
-    if not words:
-        for line in lines:
-            word = line.strip().replace('-', '').replace('–', '').replace('—', '').strip()
-            if word and main_word not in word and len(word.split()) == 1 and word != "الخيارات:" and not word.startswith("وزن:"):
-                words.append(word)
-    return words
+def share_root(word1, word2):
+    w1 = normalize_al(word1)
+    w2 = normalize_al(word2)
+    return w1[:3] == w2[:3] or w1[:4] == w2[:4]
 
 def is_semantically_related(main_word, candidate, client, model="gpt-4.1"):
-    prompt = f"""In Arabic, is "{normalize_al(candidate)}" a synonym or closely related in meaning to "{normalize_al(main_word)}"? Answer only with نعم (yes) or لا (no), or explain if close."""
+    prompt = f"""In Arabic, is "{normalize_al(candidate)}" a synonym (or the closest in meaning) to "{normalize_al(main_word)}"? Answer only with نعم (yes) or لا (no), or explain if close."""
     response = client.chat.completions.create(
         model=model,
         messages=[{"role": "user", "content": prompt}],
@@ -193,84 +95,70 @@ def is_semantically_related(main_word, candidate, client, model="gpt-4.1"):
         return True
     return False
 
-def share_root(word1, word2):
-    # Very basic heuristic: if the first 3 (or 4) letters after "ال" match, consider as same root.
-    # For production, use a real Arabic root extractor.
-    w1 = normalize_al(word1)
-    w2 = normalize_al(word2)
-    return w1[:3] == w2[:3] or w1[:4] == w2[:4]
+def extract_mcq_choices_and_answer(gpt_output, main_word):
+    # Extract choices and correct answer from model output
+    lines = gpt_output.strip().split('\n')
+    choices = []
+    correct = None
+    for line in lines:
+        m = re.match(r'^([أ-د][\)\-]?)\s*(.+)', line.strip())
+        if m:
+            choices.append((m.group(1), m.group(2)))
+        if line.strip().startswith("الإجابة الصحيحة"):
+            correct = line.strip().split(":", 1)[-1].strip()
+    # Remove words with same root as main word
+    filtered_choices = [(label, word) for label, word in choices if not share_root(main_word, word)]
+    return filtered_choices, correct
 
 def generate_mcq_arabic_word_meaning(main_word, reference_questions, grade):
     prompt = f"""{PROMPT_HEADER}
 الكلمة الرئيسية: "{main_word}"
 الأسئلة المرجعية: {reference_questions[:3]}
-اكتب وزن الكلمات التي ستستخدمها (إن أمكن)، ثم قائمة بـ10 كلمات، كل كلمة في سطر، قريبة في المعنى من "{main_word}".
 """
     response = client.chat.completions.create(
         model="gpt-4.1",
         messages=[{"role": "user", "content": prompt}],
         temperature=0.6,
-        max_tokens=400,
+        max_tokens=512,
     )
     gpt_output = response.choices[0].message.content.strip()
-    candidate_words = extract_candidate_words(gpt_output, main_word)
-    filtered = filter_by_length(candidate_words)
+    choices, correct = extract_mcq_choices_and_answer(gpt_output, main_word)
 
+    # Enforce "ال" if main word has it
     if has_al(main_word):
-        filtered = ensure_al(filtered)
+        choices = [(label, word if word.startswith("ال") else "ال" + word) for label, word in choices]
+        if correct and not correct.split(")", 1)[-1].strip().startswith("ال"):
+            correct_label = correct.split(")")[0]
+            correct_word = correct.split(")", 1)[-1].strip()
+            correct = f"{correct_label}) {'ال'+correct_word}"
 
-    # Remove candidates with the same root as the main word
-    filtered = [w for w in filtered if not share_root(main_word, w)]
-    candidate_words_no_root = [w for w in candidate_words if not share_root(main_word, w)]
-
-    # 1. Try strict: pattern+length+semantic
-    correct_synonym = None
-    distractors = []
-    for w in filtered:
-        if is_semantically_related(main_word, w, client) and not correct_synonym:
-            correct_synonym = w
-        else:
-            distractors.append(w)
-    if correct_synonym and len(distractors) >= 3:
-        choices = [correct_synonym] + distractors[:3]
-        letters = ['أ', 'ب', 'ج', 'د']
-        display_choices = [f"{letters[i]}) {choices[i]}" for i in range(len(choices))]
-        if has_al(main_word):
-            display_choices = ensure_al_in_choices(display_choices)
+    if len(choices) < 4 or not correct:
+        # Fallback: try to generate as before with semantic filtering
+        candidate_words = [w for _, w in choices]
+        filtered = filter_by_length(candidate_words)
+        filtered = [w for w in filtered if not share_root(main_word, w)]
+        correct_synonym = None
+        distractors = []
+        for w in filtered:
+            if is_semantically_related(main_word, w, client) and not correct_synonym:
+                correct_synonym = w
+            else:
+                distractors.append(w)
+        if correct_synonym and len(distractors) >= 3:
+            letters = ['أ', 'ب', 'ج', 'د']
+            display_choices = [f"{letters[i]}) {w}" for i, w in enumerate([correct_synonym] + distractors[:3])]
+            if has_al(main_word):
+                display_choices = ensure_al_in_choices(display_choices)
+            question = f"ما معنى كلمة \"{main_word}\"؟\n\n" + "\n".join(display_choices)
+            answer = display_choices[0]
+            return question, answer, None
+        return None, None, "تعذر توليد خيارات مناسبة."
+    else:
+        # Compose question
+        display_choices = [f"{label}) {word}" for label, word in choices]
         question = f"ما معنى كلمة \"{main_word}\"؟\n\n" + "\n".join(display_choices)
-        answer = display_choices[0]
+        answer = correct
         return question, answer, None
-
-    # 2. Relax: just semantic (ignore pattern/length)
-    semantically_related = []
-    for w in candidate_words_no_root:
-        if is_semantically_related(main_word, w, client):
-            semantically_related.append(w)
-        if len(semantically_related) == 4:
-            break
-    if len(semantically_related) == 4:
-        letters = ['أ', 'ب', 'ج', 'د']
-        display_choices = [f"{letters[i]}) {semantically_related[i]}" for i in range(4)]
-        if has_al(main_word):
-            display_choices = ensure_al_in_choices(display_choices)
-        question = f"ما معنى كلمة \"{main_word}\"؟\n\n" + "\n".join(display_choices)
-        answer = display_choices[0]
-        msg = "تم تخفيف شرط الوزن وعدد الحروف لضمان جودة الخيارات."
-        return question, answer, msg
-
-    # 3. Fallback: just give first 4 candidates (excluding same root)
-    choices = candidate_words_no_root[:4]
-    if choices:
-        letters = ['أ', 'ب', 'ج', 'د']
-        display_choices = [f"{letters[i]}) {choices[i]}" for i in range(len(choices))]
-        if has_al(main_word):
-            display_choices = ensure_al_in_choices(display_choices)
-        question = f"ما معنى كلمة \"{main_word}\"؟\n\n" + "\n".join(display_choices)
-        answer = display_choices[0]
-        msg = "تم تخفيف جميع الشروط وتم اختيار أفضل الخيارات المتاحة."
-        return question, answer, msg
-
-    return None, None, "تعذر توليد خيارات مناسبة."
 
 def generate_meaning_test_llm(num_questions, reference_questions, grade):
     questions = []
