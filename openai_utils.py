@@ -53,35 +53,35 @@ Examples (use this format exactly):
 مرفوع
 مكتوب
 
-الكلمة الرئيسية": الدجى"
+الكلمة الرئيسية: "الدجى"
 الخيارات:
 الأصيل
 الظلام
 الشفق
 النور
 
-الكلمة الرئيسية": الخضوع"
+الكلمة الرئيسية: "الخضوع"
 الخيارات:
 الجحود
 القعود
 الركوع
 الخشوع
 
-الكلمة الرئيسية": برع"
+الكلمة الرئيسية: "برع"
 الخيارات:
 فاق
 رام
 نام
 خاف
 
-الكلمة الرئيسية": عتيق"
+الكلمة الرئيسية: "عتيق"
 الخيارات:
 حديث
 جميل
 قديم
 عنيف
 
-الكلمة الرئيسية": طأطأ"
+الكلمة الرئيسية: "طأطأ"
 الخيارات:
 خفض
 رفع
@@ -160,7 +160,6 @@ def ensure_al(words):
     return [w if w.startswith("ال") else "ال" + w for w in words]
 
 def ensure_al_in_choices(choices):
-    # choices in format: "أ) كلمة"
     ensured = []
     for c in choices:
         m = re.match(r'^([أ-د][\)\-]?)\s*(.+)', c)
@@ -205,15 +204,20 @@ def extract_candidate_words(gpt_output, main_word):
     return words
 
 def is_semantically_related(main_word, candidate, client, model="gpt-4.1"):
-    prompt = f"""In Arabic, is "{candidate}" a synonym or closely related in meaning to "{main_word}"? Answer only with نعم (yes) or لا (no)."""
+    prompt = f"""In Arabic, is "{candidate}" a synonym or closely related in meaning to "{main_word}"? Answer only with نعم (yes) or لا (no), or explain if close."""
     response = client.chat.completions.create(
         model=model,
         messages=[{"role": "user", "content": prompt}],
         temperature=0,
-        max_tokens=10,
+        max_tokens=20,
     )
     answer = response.choices[0].message.content.strip()
-    return "نعم" in answer
+    # Relaxed: accept 'نعم' or 'قريب' (without 'لا')
+    if 'نعم' in answer:
+        return True
+    if 'قريب' in answer and 'لا' not in answer:
+        return True
+    return False
 
 def generate_mcq_arabic_word_meaning(main_word, reference_questions, grade):
     prompt = f"""{PROMPT_HEADER}
@@ -298,10 +302,8 @@ def generate_meaning_test_llm(num_questions, reference_questions, grade):
 
 # --- Contextual Word Meaning MCQ (معنى الكلمة حسب السياق) ---
 def extract_contextual_mcq_parts(gpt_output):
-    # Extract the main question block (up to first "نلاحظ" or end)
     question_part = gpt_output.split('\n\nنلاحظ')[0] if '\n\nنلاحظ' in gpt_output else gpt_output
 
-    # Find the answer letter (أ|ب|ج|د) from any answer line
     answer_letter = None
     answer_line = None
     for line in gpt_output.split('\n'):
@@ -317,7 +319,6 @@ def extract_contextual_mcq_parts(gpt_output):
             answer_line = f"الإجابة الصحيحة: ({answer_letter})"
             break
 
-    # Enforce "ال" in choices if underlined word has "ال"
     underlined_word = extract_underlined_word(question_part)
     if underlined_word and has_al(underlined_word):
         question_part = enforce_al_in_context_choices(question_part)
@@ -325,25 +326,21 @@ def extract_contextual_mcq_parts(gpt_output):
     return question_part.strip(), answer_line
 
 def extract_underlined_word(question_text):
-    # Try to find a word between underscores or with <u>...</u> or similar
     match = re.search(r'_(\w+)_', question_text)
     if match:
         return match.group(1)
-    # Fallback: find the first word with "ال" in the question
     for word in question_text.split():
         if word.startswith("ال"):
             return word
     return None
 
 def enforce_al_in_context_choices(question_text):
-    # Replace all choices (أ|ب|ج|د)- كلمة with (أ|ب|ج|د)- الكلمة (if not already)
     def repl(m):
         label = m.group(1)
         word = m.group(2)
         if not word.startswith("ال"):
             word = "ال" + word
         return f"{label}- {word}"
-    # Arabic dash or parenthesis formats
     return re.sub(r'([أ-د][\)\-]?)\s*([^\n]+)', repl, question_text)
 
 def generate_mcq_contextual_word_meaning(reference_questions, grade):
