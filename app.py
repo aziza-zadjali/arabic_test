@@ -71,19 +71,15 @@ elif question_type == "معنى الكلمة حسب السياق":
                 st.error("لا توجد أسئلة مرجعية في هذه المرحلة/المهارة. تأكد من وجود الملفات في المسار الصحيح.")
             else:
                 if num_questions == 1:
-                    question, answer = generate_contextual_question(reference_questions, selected_grade)
+                    question, answer_line = generate_contextual_question(reference_questions, selected_grade)
                     st.markdown(question)
-                    if answer != "غير محدد":
-                        st.success(f"الإجابة الصحيحة: {answer}")
-                    else:
-                        st.warning("تعذر تحديد الإجابة الصحيحة لهذا السؤال تلقائيًا.")
+                    if answer_line:
+                        st.success(answer_line)
                 else:
                     test = generate_contextual_test(num_questions, reference_questions, selected_grade)
                     if not test:
                         st.error("تعذر توليد عدد كافٍ من الأسئلة السياقية. حاول مجددًا أو قلل العدد.")
-                    for idx, (question, answer) in enumerate(test, 1):
+                    for idx, (question, answer_line) in enumerate(test, 1):
                         st.markdown(f"**{idx}. {question}**")
-                        if answer != "غير محدد":
-                            st.success(f"الإجابة الصحيحة: {answer}")
-                        else:
-                            st.warning("تعذر تحديد الإجابة الصحيحة لهذا السؤال تلقائيًا.")
+                        if answer_line:
+                            st.success(answer_line)
