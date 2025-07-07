@@ -9,8 +9,8 @@ from question_generator import (
 grades = ["الصف السابع والثامن"]
 skills = {"الأسئلة اللفظية": "الأسئلة_اللفظية"}
 
-st.title("مولد أسئلة معاني الكلمات")
-st.write("اختر نوع السؤال ثم أحد الخيارات المتاحة:")
+st.title("مولد أسئلة اللغة العربية")
+st.write("اختر نوع السؤال:")
 
 question_type = st.selectbox(
     "اختر نوع السؤال:",
