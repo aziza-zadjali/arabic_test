@@ -15,7 +15,7 @@ Instructions:
 - Do not repeat words.
 - Do not include words with the same root as the main word.
 
-Examples:
+Examples (use this format exactly):
 
 وزن: تفعيل
 كلمات:
@@ -96,44 +96,38 @@ def filter_by_length(words):
     return filtered if len(filtered) >= 4 else words[:4]
 
 def extract_candidate_words(gpt_output, main_word):
-    # Extract words after the pattern header if present
     lines = gpt_output.strip().split('\n')
     words = []
     collecting = False
     for line in lines:
         l = line.strip()
-        # Start collecting after "كلمات:" or after "الخيارات:"
         if l.startswith("كلمات:") or l.startswith("الخيارات:"):
             collecting = True
             continue
-        # Stop collecting if a new pattern/weight appears
         if l.startswith("وزن:"):
             collecting = False
             continue
         if collecting:
             word = l.replace('-', '').replace('–', '').replace('—', '').strip()
-            if (
-                word and
-                main_word not in word and
-                len(word.split()) == 1 and
-                word != "الخيارات:" and
-                not word.startswith("الخيارات")
-            ):
+            if word and main_word not in word and len(word.split()) == 1 and word != "الخيارات:":
                 words.append(word)
-    # Fallback: if nothing collected, try all single-word lines not matching headers
     if not words:
         for line in lines:
             word = line.strip().replace('-', '').replace('–', '').replace('—', '').strip()
-            if (
-                word and
-                main_word not in word and
-                len(word.split()) == 1 and
-                word != "الخيارات:" and
-                not word.startswith("الخيارات") and
-                not word.startswith("وزن:")
-            ):
+            if word and main_word not in word and len(word.split()) == 1 and word != "الخيارات:" and not word.startswith("وزن:"):
                 words.append(word)
     return words
+
+def is_semantically_related(main_word, candidate, client, model="gpt-4.1"):
+    prompt = f"""In Arabic, is "{candidate}" a synonym or closely related in meaning to "{main_word}"? Answer only with نعم (yes) or لا (no)."""
+    response = client.chat.completions.create(
+        model=model,
+        messages=[{"role": "user", "content": prompt}],
+        temperature=0,
+        max_tokens=10,
+    )
+    answer = response.choices[0].message.content.strip()
+    return "نعم" in answer
 
 def generate_mcq_arabic_word_meaning(main_word, reference_questions, grade):
     prompt = f"""{PROMPT_HEADER}
@@ -150,10 +144,20 @@ def generate_mcq_arabic_word_meaning(main_word, reference_questions, grade):
     gpt_output = response.choices[0].message.content.strip()
     candidate_words = extract_candidate_words(gpt_output, main_word)
     filtered = filter_by_length(candidate_words)
-    if len(filtered) < 4:
-        return ("تعذر توليد خيارات متوافقة في عدد الحروف ووزن الكلمة. حاول بكلمة أخرى.", "")
+    
+    # Semantic filtering using the LLM itself
+    semantically_related = []
+    for w in filtered:
+        if is_semantically_related(main_word, w, client):
+            semantically_related.append(w)
+        if len(semantically_related) == 4:
+            break
+
+    if len(semantically_related) < 4:
+        return ("تعذر توليد خيارات متوافقة في الوزن والحروف والمعنى. حاول بكلمة أخرى.", "")
+
     letters = ['أ', 'ب', 'ج', 'د']
-    choices = [f"{letters[i]}) {filtered[i]}" for i in range(4)]
+    choices = [f"{letters[i]}) {semantically_related[i]}" for i in range(4)]
     question = f"ما معنى كلمة \"{main_word}\"؟\n\n" + "\n".join(choices)
     answer = choices[0]
     return question, answer
