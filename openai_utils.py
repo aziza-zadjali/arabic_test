@@ -7,7 +7,92 @@ client = openai.OpenAI(api_key=get_openai_api_key())
 analyzer = Analyzer.pretrained()
 
 PROMPT_HEADER = """
-You are an expert in Arabic language assessment. Generate a pool of at least 10 Arabic words (not including the main word), all close in meaning to the main word, as possible distractors for an MCQ. The words should be in a list, each on a new line.
+You are an expert in Arabic language assessment. Generate a pool of at least 12 Arabic words (not including the main word), all close in meaning to the main word, as possible distractors for an MCQ. The words should be in a list, each on a new line, and should be single words (not phrases).
+
+Instructions:
+- Do NOT include the main word itself.
+- All words must be close in meaning (synonyms or semantically related).
+- Try to suggest words that are commonly used in Arabic exams for grades 7/8.
+- Do not repeat words.
+- Do not include words with the same root as the main word.
+
+Examples:
+الكلمة الرئيسية: "ترويج"
+الخيارات:
+تسويق
+تغليف
+تنفيذ
+ترحيل
+تدوين
+تحليل
+تمثيل
+تجريب
+
+الكلمة الرئيسية: "مآثر"
+الخيارات:
+مساكن
+مداخل
+مراجع
+محاسن
+مناقب
+مواقع
+مخارج
+مكاتب
+
+الكلمة الرئيسية: "الدجى"
+الخيارات:
+الأصيل
+الظلام
+الشفق
+النور
+الليل
+العتمة
+الغسق
+الضباب
+
+الكلمة الرئيسية: "الخضوع"
+الخيارات:
+الجحود
+القعود
+الركوع
+الخشوع
+الاستسلام
+الانقياد
+الطاعة
+الخنوع
+
+الكلمة الرئيسية: "برع"
+الخيارات:
+فاق
+رام
+نام
+خاف
+تفوق
+أبدع
+تميز
+تألق
+
+الكلمة الرئيسية: "عتيق"
+الخيارات:
+حديث
+جميل
+قديم
+عنيف
+بالٍ
+تراثي
+أثري
+قديم
+
+الكلمة الرئيسية: "طأطأ"
+الخيارات:
+خفض
+رفع
+مال
+دفع
+انحنى
+أمال
+سطح
+هبط
 """
 
 def get_wazn(word):
@@ -37,6 +122,7 @@ def extract_candidate_words(gpt_output, main_word):
     words = []
     for line in lines:
         word = line.strip().replace('-', '').replace('–', '').replace('—', '').strip()
+        # Exclude empty lines, main word, and phrases
         if word and main_word not in word and len(word.split()) == 1:
             words.append(word)
     return words
@@ -44,9 +130,9 @@ def extract_candidate_words(gpt_output, main_word):
 def generate_mcq_arabic_word_meaning(main_word, reference_questions, grade):
     # Step 1: Generate candidate words
     prompt = f"""{PROMPT_HEADER}
-Main word: "{main_word}"
-Reference questions: {reference_questions[:3]}
-List at least 10 words, each on a new line, all close in meaning to "{main_word}".
+الكلمة الرئيسية: "{main_word}"
+الأسئلة المرجعية: {reference_questions[:3]}
+اقترح 12 كلمة، كل كلمة في سطر، قريبة في المعنى من "{main_word}".
 """
     response = client.chat.completions.create(
         model="gpt-3.5-turbo",
@@ -71,12 +157,11 @@ List at least 10 words, each on a new line, all close in meaning to "{main_word}
     return question, answer
 
 def generate_meaning_test_llm(num_questions, reference_questions, grade):
-    # For each question, pick a random main word from a reference list or use LLM to suggest
-    # Here, for demonstration, we use the LLM to pick a random word for each question
     questions = []
+    used_words = set()
     for _ in range(num_questions):
         # Ask LLM for a suitable Arabic word for MCQ (not already used)
-        prompt = "Suggest a single Arabic word suitable for a vocabulary MCQ for grade 7/8."
+        prompt = "Suggest a single, exam-appropriate Arabic word (not a phrase) for a vocabulary MCQ for grade 7/8. Do not repeat previous words."
         response = client.chat.completions.create(
             model="gpt-3.5-turbo",
             messages=[{"role": "user", "content": prompt}],
@@ -84,6 +169,9 @@ def generate_meaning_test_llm(num_questions, reference_questions, grade):
             max_tokens=20,
         )
         main_word = response.choices[0].message.content.strip().split()[0]
+        if main_word in used_words:
+            continue
+        used_words.add(main_word)
         q, a = generate_mcq_arabic_word_meaning(main_word, reference_questions, grade)
         questions.append((q, a))
     return questions
