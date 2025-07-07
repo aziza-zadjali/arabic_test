@@ -268,6 +268,16 @@ CONTEXTUAL_PROMPT = """
 نلاحظ أن رمز الإجابة الصحيحة هو (أ) حيث أن كلمة (امتدّت) هي الأقرب معنى لكلمة (اشرأبت) في هذا السياق.
 """
 
+def extract_contextual_mcq_answer(gpt_output):
+    # Try to extract (أ|ب|ج|د) from various possible answer lines
+    match = re.search(r'رمز الإجابة الصحيحة (?:هو)?\s*[\:\(]?\s*([أ-د])[\)\s]*', gpt_output)
+    if match:
+        return match.group(1)
+    match2 = re.search(r'الإجابة الصحيحة\s*[:\(]?\s*([أ-د])[\)\s]*', gpt_output)
+    if match2:
+        return match2.group(1)
+    return "غير محدد"
+
 def generate_mcq_contextual_word_meaning(reference_questions, grade):
     prompt = CONTEXTUAL_PROMPT + "\n\nيرجى توليد سؤال واحد فقط بالتنسيق أعلاه."
     response = client.chat.completions.create(
@@ -278,6 +288,16 @@ def generate_mcq_contextual_word_meaning(reference_questions, grade):
     )
     gpt_output = response.choices[0].message.content.strip()
     question_part = gpt_output.split('\n\nنلاحظ')[0] if '\n\nنلاحظ' in gpt_output else gpt_output
-    answer_match = re.search(r'رمز الإجابة الصحيحة هو ?\)?([أ-د])\)?', gpt_output)
-    answer = answer_match.group(1) if answer_match else "غير محدد"
+    answer = extract_contextual_mcq_answer(gpt_output)
     return question_part.strip(), answer
+
+def generate_contextual_test_llm(num_questions, reference_questions, grade):
+    questions = []
+    max_attempts = num_questions * 6
+    attempts = 0
+    while len(questions) < num_questions and attempts < max_attempts:
+        attempts += 1
+        q, a = generate_mcq_contextual_word_meaning(reference_questions, grade)
+        if q and a and a != "غير محدد":
+            questions.append((q, a))
+    return questions
