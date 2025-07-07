@@ -7,26 +7,22 @@ client = openai.OpenAI(api_key=get_openai_api_key())
 analyzer = Analyzer.pretrained()
 
 PROMPT_HEADER = """
-You are an expert in Arabic language assessment. Generate a pool of at least 12 Arabic words (not including the main word), all close in meaning to the main word, as possible distractors for an MCQ. The words should be in a list, each on a new line, and should be single words (not phrases).
+You are an expert in Arabic language assessment. Generate a pool of at least 10 Arabic words (not including the main word), all close in meaning to the main word, as possible distractors for an MCQ. The words should be in a list, each on a new line, and should be single words (not phrases).
 
 Instructions:
 - Do NOT include the main word itself.
 - All words must be close in meaning (synonyms or semantically related).
-- Try to suggest words that are commonly used in Arabic exams for grades 7/8.
 - Do not repeat words.
 - Do not include words with the same root as the main word.
 
-Examples:
+Examples (use this format exactly):
+
 الكلمة الرئيسية: "ترويج"
 الخيارات:
 تسويق
 تغليف
 تنفيذ
 ترحيل
-تدوين
-تحليل
-تمثيل
-تجريب
 
 الكلمة الرئيسية: "مآثر"
 الخيارات:
@@ -34,10 +30,6 @@ Examples:
 مداخل
 مراجع
 محاسن
-مناقب
-مواقع
-مخارج
-مكاتب
 
 الكلمة الرئيسية: "الدجى"
 الخيارات:
@@ -45,10 +37,6 @@ Examples:
 الظلام
 الشفق
 النور
-الليل
-العتمة
-الغسق
-الضباب
 
 الكلمة الرئيسية: "الخضوع"
 الخيارات:
@@ -56,10 +44,6 @@ Examples:
 القعود
 الركوع
 الخشوع
-الاستسلام
-الانقياد
-الطاعة
-الخنوع
 
 الكلمة الرئيسية: "برع"
 الخيارات:
@@ -67,10 +51,6 @@ Examples:
 رام
 نام
 خاف
-تفوق
-أبدع
-تميز
-تألق
 
 الكلمة الرئيسية: "عتيق"
 الخيارات:
@@ -78,10 +58,6 @@ Examples:
 جميل
 قديم
 عنيف
-بالٍ
-تراثي
-أثري
-قديم
 
 الكلمة الرئيسية: "طأطأ"
 الخيارات:
@@ -89,10 +65,6 @@ Examples:
 رفع
 مال
 دفع
-انحنى
-أمال
-سطح
-هبط
 """
 
 def get_wazn(word):
@@ -122,7 +94,6 @@ def extract_candidate_words(gpt_output, main_word):
     words = []
     for line in lines:
         word = line.strip().replace('-', '').replace('–', '').replace('—', '').strip()
-        # Exclude empty lines, main word, and phrases
         if word and main_word not in word and len(word.split()) == 1:
             words.append(word)
     return words
@@ -132,7 +103,7 @@ def generate_mcq_arabic_word_meaning(main_word, reference_questions, grade):
     prompt = f"""{PROMPT_HEADER}
 الكلمة الرئيسية: "{main_word}"
 الأسئلة المرجعية: {reference_questions[:3]}
-اقترح 12 كلمة، كل كلمة في سطر، قريبة في المعنى من "{main_word}".
+اقترح 10 كلمات، كل كلمة في سطر، قريبة في المعنى من "{main_word}".
 """
     response = client.chat.completions.create(
         model="gpt-3.5-turbo",
