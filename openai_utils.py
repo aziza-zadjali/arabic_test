@@ -172,6 +172,9 @@ def ensure_al_in_choices(choices):
             ensured.append(c)
     return ensured
 
+def normalize_al(word):
+    return word[2:] if word.startswith("ال") else word
+
 # --- Word Meaning MCQ (معاني الكلمات) ---
 def filter_by_length(words):
     if not words:
@@ -204,7 +207,7 @@ def extract_candidate_words(gpt_output, main_word):
     return words
 
 def is_semantically_related(main_word, candidate, client, model="gpt-4.1"):
-    prompt = f"""In Arabic, is "{candidate}" a synonym or closely related in meaning to "{main_word}"? Answer only with نعم (yes) or لا (no), or explain if close."""
+    prompt = f"""In Arabic, is "{normalize_al(candidate)}" a synonym or closely related in meaning to "{normalize_al(main_word)}"? Answer only with نعم (yes) or لا (no), or explain if close."""
     response = client.chat.completions.create(
         model=model,
         messages=[{"role": "user", "content": prompt}],
@@ -212,7 +215,6 @@ def is_semantically_related(main_word, candidate, client, model="gpt-4.1"):
         max_tokens=20,
     )
     answer = response.choices[0].message.content.strip()
-    # Relaxed: accept 'نعم' or 'قريب' (without 'لا')
     if 'نعم' in answer:
         return True
     if 'قريب' in answer and 'لا' not in answer:
