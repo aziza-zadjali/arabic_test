@@ -1,7 +1,8 @@
 import openai
-from config import OPENAI_API_KEY
+from config import get_openai_api_key
 
-openai.api_key = OPENAI_API_KEY
+# Initialize the OpenAI client
+client = openai.OpenAI(api_key=get_openai_api_key())
 
 def generate_mcq_arabic_word_meaning(main_word, reference_questions, grade):
     prompt = f"""
@@ -20,7 +21,7 @@ C) ...
 D) ...
 الإجابة الصحيحة: (حدد الخيار الصحيح فقط)
 """
-    response = openai.ChatCompletion.create(
+    response = client.chat.completions.create(
         model="gpt-3.5-turbo",
         messages=[{"role": "user", "content": prompt}],
         temperature=0.6,
