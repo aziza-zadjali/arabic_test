@@ -208,4 +208,6 @@ def generate_meaning_test_llm(num_questions, reference_questions, grade):
         if main_word in used_words:
             continue
         used_words.add(main_word)
-        q, a, msg = generate_mcq_arabic_word_meaning(main_word
+        q, a, msg = generate_mcq_arabic_word_meaning(main_word, reference_questions, grade)
+        questions.append((q, a, msg))
+    return questions
