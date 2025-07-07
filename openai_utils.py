@@ -4,7 +4,7 @@ from config import get_openai_api_key
 
 client = openai.OpenAI(api_key=get_openai_api_key())
 
-# --- Improved Prompt for Word Meaning MCQ (معاني الكلمات) ---
+# --- Word Meaning MCQ (معاني الكلمات) ---
 PROMPT_HEADER = """
 You are an expert in Arabic language assessment. Generate a pool of at least 10 Arabic words (not including the main word), all close in meaning to the main word, as possible distractors for an MCQ.
 
@@ -99,6 +99,7 @@ CONTEXTUAL_PROMPT = """
 - أعطِ أربعة خيارات للإجابة (أ، ب، ج، د).
 - خيار واحد فقط هو الصحيح (مرادف أو الأقرب معنى في السياق).
 - وضّح رمز الإجابة الصحيحة في نهاية السؤال.
+- جميع البدائل يجب أن تكون على نفس الوزن وعدد الحروف بعضها مع بعض (لكن ليس بالضرورة نفس الكلمة الرئيسية أو الكلمة التي تحتها خط).
 
 أمثلة:
 1. ما رمز الكلمة الصحيحة التي تعتبر الأقرب معنى للكلمة التي تحتها خط في الجملة الموجودة في رأس السؤال؟
