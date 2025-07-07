@@ -1,23 +1,31 @@
 import streamlit as st
 from reference_loader import load_reference_questions
-from question_generator import create_question, generate_meaning_test
+from question_generator import (
+    create_question,
+    generate_meaning_test,
+    generate_contextual_question
+)
 
 grades = ["الصف السابع والثامن"]
 skills = {"الأسئلة اللفظية": "الأسئلة_اللفظية"}
 
 st.title("مولد أسئلة معاني الكلمات")
-st.write("اختر أحد الخيارين: توليد سؤال لمعنى كلمة، أو توليد اختبار معاني كلمات كامل.")
+st.write("اختر نوع السؤال ثم أحد الخيارات المتاحة:")
 
-option = st.radio(
-    "اختر نوع التوليد:",
-    ("توليد سؤال لمعنى كلمة", "توليد اختبار معاني الكلمات (تلقائي)")
+question_type = st.selectbox(
+    "اختر نوع السؤال:",
+    [
+        "معنى الكلمة",
+        "اختبار معاني الكلمات (تلقائي)",
+        "معنى الكلمة حسب السياق"
+    ]
 )
 
 selected_grade = grades[0]
 selected_skill_label = list(skills.keys())[0]
 selected_skill_folder = skills[selected_skill_label]
 
-if option == "توليد سؤال لمعنى كلمة":
+if question_type == "معنى الكلمة":
     main_word = st.text_input("أدخل الكلمة الرئيسية (بالعربية)")
     if st.button("توليد سؤال"):
         with st.spinner("يتم توليد السؤال..."):
@@ -34,7 +42,7 @@ if option == "توليد سؤال لمعنى كلمة":
                 st.markdown(question)
                 st.success(f"الإجابة الصحيحة: {answer}")
 
-else:
+elif question_type == "اختبار معاني الكلمات (تلقائي)":
     num_questions = st.slider("عدد الأسئلة في الاختبار", 1, 5, 3)
     if st.button("توليد اختبار"):
         with st.spinner("يتم توليد الاختبار..."):
@@ -51,3 +59,15 @@ else:
                         st.warning(f"سؤال {idx}: {msg}")
                     st.markdown(f"**{idx}. {question}**")
                     st.success(f"الإجابة الصحيحة: {answer}")
+
+elif question_type == "معنى الكلمة حسب السياق":
+    if st.button("توليد سؤال"):
+        with st.spinner("يتم توليد السؤال..."):
+            grade_folder = "الصف_السابع_والثامن"
+            reference_questions = load_reference_questions(grade_folder, selected_skill_folder)
+            if not reference_questions:
+                st.error("لا توجد أسئلة مرجعية في هذه المرحلة/المهارة. تأكد من وجود الملفات في المسار الصحيح.")
+            else:
+                question, answer = generate_contextual_question(reference_questions, selected_grade)
+                st.markdown(question)
+                st.success(f"الإجابة الصحيحة: {answer}")
