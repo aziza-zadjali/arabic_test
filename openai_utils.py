@@ -13,8 +13,8 @@ Instructions:
 - All words must be close in meaning (synonyms or semantically related).
 - Do not repeat words.
 - Do not include words with the same root as the main word.
-- All generated choices must have the same Arabic morphological pattern (وزن) as each other (e.g., all on وزن فعيل, or all on وزن مفاعل, etc.) and the same number of letters as each other. **They do NOT have to match the main word's pattern or length.**
-- List the pattern (وزن) you used, then list the words (each on a new line, no phrases).
+- Preferably, all generated choices should have the same Arabic morphological pattern (وزن) and the same number of letters as each other (e.g., all on وزن فعيل, or all on وزن مفاعل, etc.), **but if this is not possible, you may relax this constraint and provide the best set of distractors you can.**
+- List the pattern (وزن) you used (if any), then list the words (each on a new line, no phrases).
 
 Examples (use this format exactly):
 
@@ -32,26 +32,12 @@ Examples (use this format exactly):
 مراجع
 محاسن
 
-وزن: فعيل
-كلمات:
-قديم
-جميل
-أصيل
-أثري
-
-وزن: فعول
-كلمات:
-رسول
-صبور
-شكور
-حقود
-
-وزن: مفعول
-كلمات:
-محسود
-مشكور
-مرفوع
-مكتوب
+الكلمة الرئيسية: "الأصل"
+الخيارات:
+الصباح
+السحر
+الغروب
+الظهيرة
 
 الكلمة الرئيسية: "الدجى"
 الخيارات:
@@ -73,20 +59,6 @@ Examples (use this format exactly):
 رام
 نام
 خاف
-
-الكلمة الرئيسية: "عتيق"
-الخيارات:
-حديث
-جميل
-قديم
-عنيف
-
-الكلمة الرئيسية: "طأطأ"
-الخيارات:
-خفض
-رفع
-مال
-دفع
 """
 
 # --- Contextual Word Meaning MCQ (معنى الكلمة حسب السياق) ---
@@ -99,7 +71,7 @@ CONTEXTUAL_PROMPT = """
 - أعطِ أربعة خيارات للإجابة (أ، ب، ج، د).
 - خيار واحد فقط هو الصحيح (مرادف أو الأقرب معنى في السياق).
 - وضّح رمز الإجابة الصحيحة في نهاية السؤال.
-- جميع البدائل يجب أن تكون على نفس الوزن وعدد الحروف بعضها مع بعض (لكن ليس بالضرورة نفس الكلمة الرئيسية أو الكلمة التي تحتها خط).
+- يُفضّل أن تكون جميع البدائل على نفس الوزن وعدد الحروف بعضها مع بعض (لكن ليس بالضرورة نفس الكلمة الرئيسية أو الكلمة التي تحتها خط). إذا لم يكن ذلك ممكنًا، يمكنك تخفيف هذا الشرط وتقديم أفضل مجموعة متاحة من البدائل.
 
 أمثلة:
 1. ما رمز الكلمة الصحيحة التي تعتبر الأقرب معنى للكلمة التي تحتها خط في الجملة الموجودة في رأس السؤال؟
@@ -224,7 +196,7 @@ def generate_mcq_arabic_word_meaning(main_word, reference_questions, grade):
     prompt = f"""{PROMPT_HEADER}
 الكلمة الرئيسية: "{main_word}"
 الأسئلة المرجعية: {reference_questions[:3]}
-اكتب وزن الكلمات التي ستستخدمها، ثم قائمة بـ10 كلمات، كل كلمة في سطر، قريبة في المعنى من "{main_word}"، وجميعها على نفس الوزن وعدد الحروف.
+اكتب وزن الكلمات التي ستستخدمها (إن أمكن)، ثم قائمة بـ10 كلمات، كل كلمة في سطر، قريبة في المعنى من "{main_word}".
 """
     response = client.chat.completions.create(
         model="gpt-4.1",
@@ -236,11 +208,10 @@ def generate_mcq_arabic_word_meaning(main_word, reference_questions, grade):
     candidate_words = extract_candidate_words(gpt_output, main_word)
     filtered = filter_by_length(candidate_words)
 
-    # Enforce "ال" if main word has it
     if has_al(main_word):
         filtered = ensure_al(filtered)
 
-    # 1. Find at least one correct synonym/meaning match
+    # 1. Try strict: pattern+length+semantic
     correct_synonym = None
     distractors = []
     for w in filtered:
@@ -248,30 +219,46 @@ def generate_mcq_arabic_word_meaning(main_word, reference_questions, grade):
             correct_synonym = w
         else:
             distractors.append(w)
-    msg = None
-
-    if correct_synonym:
-        # Fill up to 3 distractors (even if not synonyms)
-        while len(distractors) < 3 and len(candidate_words) > len(filtered):
-            for w in candidate_words:
-                if w not in distractors and w != correct_synonym:
-                    distractors.append(w)
-                if len(distractors) == 3:
-                    break
+    if correct_synonym and len(distractors) >= 3:
         choices = [correct_synonym] + distractors[:3]
         letters = ['أ', 'ب', 'ج', 'د']
         display_choices = [f"{letters[i]}) {choices[i]}" for i in range(len(choices))]
-        # Enforce "ال" in choices as well
         if has_al(main_word):
             display_choices = ensure_al_in_choices(display_choices)
         question = f"ما معنى كلمة \"{main_word}\"؟\n\n" + "\n".join(display_choices)
         answer = display_choices[0]
-        if len(display_choices) < 4:
-            msg = "تم توليد أقل من 4 خيارات بسبب عدم توفر مشتتات كافية."
+        return question, answer, None
+
+    # 2. Relax: just semantic (ignore pattern/length)
+    semantically_related = []
+    for w in candidate_words:
+        if is_semantically_related(main_word, w, client):
+            semantically_related.append(w)
+        if len(semantically_related) == 4:
+            break
+    if len(semantically_related) == 4:
+        letters = ['أ', 'ب', 'ج', 'د']
+        display_choices = [f"{letters[i]}) {semantically_related[i]}" for i in range(4)]
+        if has_al(main_word):
+            display_choices = ensure_al_in_choices(display_choices)
+        question = f"ما معنى كلمة \"{main_word}\"؟\n\n" + "\n".join(display_choices)
+        answer = display_choices[0]
+        msg = "تم تخفيف شرط الوزن وعدد الحروف لضمان جودة الخيارات."
         return question, answer, msg
 
-    # 2. If no correct synonym, return empty answer (will be skipped in test mode)
-    return None, None, None
+    # 3. Fallback: just give first 4 candidates
+    choices = candidate_words[:4]
+    if choices:
+        letters = ['أ', 'ب', 'ج', 'د']
+        display_choices = [f"{letters[i]}) {choices[i]}" for i in range(len(choices))]
+        if has_al(main_word):
+            display_choices = ensure_al_in_choices(display_choices)
+        question = f"ما معنى كلمة \"{main_word}\"؟\n\n" + "\n".join(display_choices)
+        answer = display_choices[0]
+        msg = "تم تخفيف جميع الشروط وتم اختيار أفضل الخيارات المتاحة."
+        return question, answer, msg
+
+    return None, None, "تعذر توليد خيارات مناسبة."
 
 def generate_meaning_test_llm(num_questions, reference_questions, grade):
     questions = []
@@ -297,7 +284,7 @@ def generate_meaning_test_llm(num_questions, reference_questions, grade):
             continue
         used_words.add(main_word)
         q, a, msg = generate_mcq_arabic_word_meaning(main_word, reference_questions, grade)
-        if q and a and not msg:
+        if q and a:
             questions.append((q, a, msg))
     return questions
 
