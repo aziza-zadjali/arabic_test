@@ -4,17 +4,17 @@ from config import get_openai_api_key
 
 client = openai.OpenAI(api_key=get_openai_api_key())
 
-# --- Word Meaning MCQ (معاني الكلمات) ---
+# --- Improved Prompt for Word Meaning MCQ (معاني الكلمات) ---
 PROMPT_HEADER = """
-You are an expert in Arabic language assessment. Generate a pool of at least 10 Arabic words (not including the main word), all close in meaning to the main word, as possible distractors for an MCQ. 
-All generated words must have the same Arabic morphological pattern (وزن) as each other (e.g., all on وزن فعيل, or all on وزن مفاعل, etc.) and the same number of letters as each other. 
-List the pattern (وزن) you used, then list the words (each on a new line, no phrases).
+You are an expert in Arabic language assessment. Generate a pool of at least 10 Arabic words (not including the main word), all close in meaning to the main word, as possible distractors for an MCQ.
 
 Instructions:
 - Do NOT include the main word itself.
 - All words must be close in meaning (synonyms or semantically related).
 - Do not repeat words.
 - Do not include words with the same root as the main word.
+- All generated choices must have the same Arabic morphological pattern (وزن) as each other (e.g., all on وزن فعيل, or all on وزن مفاعل, etc.) and the same number of letters as each other. **They do NOT have to match the main word's pattern or length.**
+- List the pattern (وزن) you used, then list the words (each on a new line, no phrases).
 
 Examples (use this format exactly):
 
@@ -152,7 +152,6 @@ CONTEXTUAL_PROMPT = """
 نلاحظ أن رمز الإجابة الصحيحة هو (أ) حيث أن كلمة (امتدّت) هي الأقرب معنى لكلمة (اشرأبت) في هذا السياق.
 """
 
-# --- Utility functions for "ال" enforcement ---
 def has_al(word):
     return word.strip().startswith("ال")
 
@@ -175,7 +174,6 @@ def ensure_al_in_choices(choices):
 def normalize_al(word):
     return word[2:] if word.startswith("ال") else word
 
-# --- Word Meaning MCQ (معاني الكلمات) ---
 def filter_by_length(words):
     if not words:
         return []
