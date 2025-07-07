@@ -8,57 +8,17 @@ PROMPT_HEADER = """
 You are an expert in Arabic language assessment. Generate a multiple-choice question (MCQ) for the meaning of an Arabic word.
 
 Instructions:
-- The main word and all answer choices must be in Arabic only.
-- All four answer choices must have the same morphological pattern (وزن) and the same number of letters as each other. The pattern and letter count do NOT need to match the main word.
-- None of the choices should be the same as the main word.
+- All four answer choices must have the same morphological pattern (وزن) and the same number of letters as each other (not necessarily as the main word).
+- Do NOT include the main word as a choice.
 - All choices must be close in meaning (synonyms or related words).
-- Clearly indicate which option is the correct answer.
-- If you cannot find four suitable options, do your best to create plausible distractors.
+- Present the choices in the following format, each on a new line:
+أ) ...
+ب) ...
+ج) ...
+د) ...
+- Clearly indicate the correct answer.
 
 Examples:
-Main word: "ترويج"
-Choices:
-أ - تسويق
-ب - تغليف
-ج - تنفيذ
-د - ترحيل
-
-Main word: "مآثر"
-Choices:
-أ - مساكن
-ب - مداخل
-ج - مراجع
-د - محاسن
-Note: The correct answer for "مآثر" is "د" (محاسن), as it is closest in meaning.
-
-معاني الكلمات MCQ examples:
-1. الدجى:
-أ- الأصيل    ب- الظلام    ج- الشفق    د- النور
-
-2. الخضوع:
-أ- الجحود    ب- القعود    ج- الركوع    د- الخشوع
-
-3. برع:
-أ- فاق    ب- رام    ج- نام    د- خاف
-
-4. عتيق:
-أ- حديث    ب- جميل    ج- قديم    د- عنيف
-
-5. طأطأ:
-أ- خفض    ب- رفع    ج- مال    د- دفع
-
----
-
-أنت خبير في إعداد أسئلة اللغة العربية. أنشئ سؤال اختيار من متعدد لمعنى كلمة عربية.
-
-التعليمات:
-- الكلمة الرئيسية وجميع الخيارات يجب أن تكون باللغة العربية فقط.
-- يجب أن يكون لجميع الخيارات الأربعة نفس الوزن الصرفي (مثل: تفعيل، فعيل، مفعول، إلخ) ونفس عدد الحروف مع بعضها البعض (ليس بالضرورة مع الكلمة الرئيسية).
-- لا يجب أن تتكرر الكلمة الرئيسية في الخيارات.
-- جميع الخيارات يجب أن تكون متقاربة في المعنى (مرادفات أو كلمات ذات صلة).
-- حدد بوضوح الخيار الصحيح.
-
-أمثلة:
 الكلمة الرئيسية: "ترويج"
 الخيارات:
 أ - تسويق
@@ -74,74 +34,110 @@ Note: The correct answer for "مآثر" is "د" (محاسن), as it is closest i
 د - محاسن
 ملاحظة: رمز الإجابة الصحيحة لمعنى كلمة "مآثر" هو "د" (محاسن)، إذ أن كلمة "محاسن" هي الأقرب معنى لكلمة "مآثر"، أما بقية البدائل الأخرى فلا تدل على المعنى الصحيح.
 
-اختبار معاني الكلمات:
-1. الدجى:
-أ- الأصيل    ب- الظلام    ج- الشفق    د- النور
+الكلمة الرئيسية: "الدجى"
+الخيارات:
+أ - الأصيل
+ب - الظلام
+ج - الشفق
+د - النور
 
-2. الخضوع:
-أ- الجحود    ب- القعود    ج- الركوع    د- الخشوع
+الكلمة الرئيسية: "الخضوع"
+الخيارات:
+أ - الجحود
+ب - القعود
+ج - الركوع
+د - الخشوع
 
-3. برع:
-أ- فاق    ب- رام    ج- نام    د- خاف
+الكلمة الرئيسية: "برع"
+الخيارات:
+أ - فاق
+ب - رام
+ج - نام
+د - خاف
 
-4. عتيق:
-أ- حديث    ب- جميل    ج- قديم    د- عنيف
+الكلمة الرئيسية: "عتيق"
+الخيارات:
+أ - حديث
+ب - جميل
+ج - قديم
+د - عنيف
 
-5. طأطأ:
-أ- خفض    ب- رفع    ج- مال    د- دفع
+الكلمة الرئيسية: "طأطأ"
+الخيارات:
+أ - خفض
+ب - رفع
+ج - مال
+د - دفع
+---
+أنت خبير في إعداد أسئلة اللغة العربية. أنشئ سؤال اختيار من متعدد لمعنى كلمة عربية.
+
+التعليمات:
+- الكلمة الرئيسية وجميع الخيارات يجب أن تكون باللغة العربية فقط.
+- يجب أن يكون لجميع الخيارات الأربعة نفس الوزن الصرفي (مثل: تفعيل، فعيل، مفعول، إلخ) ونفس عدد الحروف مع بعضها البعض (ليس بالضرورة مع الكلمة الرئيسية).
+- لا يجب أن تتكرر الكلمة الرئيسية في الخيارات.
+- جميع الخيارات يجب أن تكون متقاربة في المعنى (مرادفات أو كلمات ذات صلة).
+- قدم الخيارات بالتنسيق التالي، كل خيار في سطر جديد:
+أ) ...
+ب) ...
+ج) ...
+د) ...
+- حدد بوضوح الخيار الصحيح.
+
+أمثلة:
+(نفس الأمثلة أعلاه)
+---
 """
 
-def extract_choices_and_answer(gpt_output):
-    """
-    Extracts choices and the correct answer from the GPT output.
-    Returns (formatted_question, correct_answer)
-    """
-    # Find the question line
+def extract_choices_and_answer(gpt_output, main_word=None):
     lines = gpt_output.strip().split('\n')
-    question_line = ""
-    choices_lines = []
-    answer_line = ""
+    choices = []
+    answer = ""
+    question = ""
     for line in lines:
         if "ما معنى" in line:
-            question_line = line.strip()
+            question = line.strip()
         elif re.match(r'^[أ-د]\)?[\s\-–—]+', line.strip()):
-            choices_lines.append(line.strip())
+            choices.append(line.strip())
         elif "الإجابة الصحيحة" in line or "الإجابة" in line:
-            answer_line = line.strip()
+            answer = line.strip()
+    if not choices:
+        choices = [l for l in lines if l.strip().startswith(('أ', 'ب', 'ج', 'د'))]
 
-    # If choices are not found, try alternative extraction
-    if not choices_lines:
-        choices_lines = [l for l in lines if l.strip().startswith(('أ', 'ب', 'ج', 'د'))]
+    if main_word:
+        choices = [c for c in choices if main_word not in c]
 
-    # Format choices for display
-    formatted_choices = "\n".join(choices_lines)
-    formatted_question = f"{question_line}\n\n{formatted_choices}"
+    # Enforce same length for all choices
+    def clean_choice(choice):
+        return re.sub(r'^[أ-د]\)?[\s\-–—]+', '', choice).strip()
+    if choices:
+        target_len = len(clean_choice(choices[0]))
+        filtered = [c for c in choices if len(clean_choice(c)) == target_len]
+        if len(filtered) == 4:
+            choices = filtered
 
-    # Extract answer letter or text
-    answer = ""
-    if answer_line:
-        # Try to extract letter and text
-        m = re.search(r'([أ-د])\)?[ \-–—]*(\S+)?', answer_line)
+    formatted_choices = "\n".join(choices)
+    formatted_question = f"{question}\n\n{formatted_choices}"
+
+    correct = ""
+    if answer:
+        m = re.search(r'([أ-د])\)?[ \-–—]*(\\S+)?', answer)
         if m:
             letter = m.group(1)
-            # Try to find full text for this letter
-            for ch in choices_lines:
+            for ch in choices:
                 if ch.startswith(letter):
-                    answer = ch
+                    correct = ch
                     break
             else:
-                answer = answer_line
+                correct = answer
         else:
-            answer = answer_line
+            correct = answer
     else:
-        answer = "غير محدد"
+        correct = "غير محدد"
 
-    return formatted_question, answer
+    return formatted_question, correct
 
 def generate_mcq_arabic_word_meaning(main_word, reference_questions, grade):
     prompt = f"""{PROMPT_HEADER}
-
-الآن:
 الكلمة الرئيسية: "{main_word}"
 الأسئلة المرجعية: {reference_questions[:3]}
 
@@ -160,12 +156,10 @@ Question format:
         max_tokens=400,
     )
     gpt_output = response.choices[0].message.content.strip()
-    return extract_choices_and_answer(gpt_output)
+    return extract_choices_and_answer(gpt_output, main_word=main_word)
 
-def generate_meaning_test(num_questions, reference_questions, grade):
+def generate_meaning_test_llm(num_questions, reference_questions, grade):
     prompt = f"""{PROMPT_HEADER}
-
-الآن:
 أنشئ اختبار معاني كلمات مكون من {num_questions} أسئلة، كل سؤال في سطر منفصل، مع عرض الخيارات بشكل واضح، وتوضيح الإجابة الصحيحة لكل سؤال.
 الأسئلة المرجعية: {reference_questions[:3]}
 صيغة كل سؤال:
@@ -184,18 +178,15 @@ def generate_meaning_test(num_questions, reference_questions, grade):
     )
     gpt_output = response.choices[0].message.content.strip()
 
-    # Split questions by finding lines that start with a number or "ما معنى"
-    questions = []
     blocks = re.split(r'\n(?=\d+\.\s|ما معنى)', gpt_output)
+    questions = []
     for block in blocks:
         if "ما معنى" in block:
             q, a = extract_choices_and_answer(block)
             questions.append((q, a))
         if len(questions) >= num_questions:
             break
-    # Fallback: if not enough, try to parse more blocks
     if len(questions) < num_questions:
-        # Try to split by double newlines
         more_blocks = gpt_output.split('\n\n')
         for block in more_blocks:
             if "ما معنى" in block and (block, "") not in questions:
