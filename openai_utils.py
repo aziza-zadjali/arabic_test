@@ -200,14 +200,18 @@ def extract_candidate_words(gpt_output, main_word):
 
 def generate_fallback_choices(main_word, client):
     """Generate fallback choices when the main prompt fails"""
-    prompt = f"""Generate 4 Arabic words that are synonyms or closely related in meaning to "{main_word}". Do not include the main word itself. List one word per line."""
+    prompt = f"""Generate 4 Arabic words that are synonyms or closely related in meaning to "{main_word}". Use the same form (with or without ال) as the main word. List one word per line, no explanations."""
     response = client.chat.completions.create(
         model="gpt-4.1",
         messages=[{"role": "user", "content": prompt}],
         temperature=0.7,
         max_tokens=100,
     )
-    words = [w.strip() for w in response.choices[0].message.content.strip().split('\n') if w.strip()]
+    words = []
+    for line in response.choices[0].message.content.strip().split('\n'):
+        word = line.strip()
+        if word and len(word.split()) == 1:
+            words.append(word)
     return words[:4]
 
 def generate_mcq_arabic_word_meaning(main_word, reference_questions, grade):
@@ -230,19 +234,26 @@ def generate_mcq_arabic_word_meaning(main_word, reference_questions, grade):
     
     if len(candidate_words) < 4:
         # Fallback: generate simple synonyms
-        candidate_words = generate_fallback_choices(main_word, client)
+        fallback_words = generate_fallback_choices(main_word, client)
+        candidate_words.extend(fallback_words)
         candidate_words = [w for w in candidate_words if not share_root(main_word, w)]
 
     if len(candidate_words) < 4:
-        # Ultimate fallback: create basic choices
+        # Ultimate fallback: create basic choices with correct form
         if has_al(main_word):
-            candidate_words = ["الكرم", "الجود", "العطاء", "البذل"]
+            candidate_words.extend(["الكرم", "الجود", "العطاء", "البذل"])
         else:
-            candidate_words = ["كرم", "جود", "عطاء", "بذل"]
+            candidate_words.extend(["كرم", "جود", "عطاء", "بذل"])
 
-    # Enforce "ال" if main word has it
+    # Ensure we have at least 4 unique words
+    candidate_words = list(dict.fromkeys(candidate_words))  # Remove duplicates while preserving order
+    candidate_words = candidate_words[:4]  # Take first 4
+
+    # Enforce "ال" consistency if main word has it
     if has_al(main_word):
-        candidate_words = ensure_al(candidate_words)
+        candidate_words = [w if w.startswith("ال") else "ال" + w for w in candidate_words]
+    else:
+        candidate_words = [w[2:] if w.startswith("ال") else w for w in candidate_words]
 
     # Try to find semantic matches
     correct_synonym = None
@@ -272,7 +283,7 @@ def generate_mcq_arabic_word_meaning(main_word, reference_questions, grade):
     answer = display_choices[0]
     
     msg = None
-    if len(candidate_words) < 4:
+    if len(extract_candidate_words(gpt_output, main_word)) < 4:
         msg = "تم استخدام خيارات احتياطية لضمان توليد السؤال."
     
     return question, answer, msg
