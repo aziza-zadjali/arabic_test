@@ -360,44 +360,65 @@ def enforce_al_in_context_choices(choices, underlined_word):
 
 def generate_mcq_contextual_word_meaning(reference_questions, grade):
     prompt = CONTEXTUAL_PROMPT + "\n\nيرجى توليد سؤال واحد فقط بالتنسيق أعلاه."
-    response = client.chat.completions.create(
-        model="gpt-4.1",
-        messages=[{"role": "user", "content": prompt}],
-        temperature=0.6,
-        max_tokens=400,
-    )
-    gpt_output = response.choices[0].message.content.strip()
-    question_part, answer_line = extract_contextual_mcq_parts(gpt_output)
+    try:
+        response = client.chat.completions.create(
+            model="gpt-4.1",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.6,
+            max_tokens=400,
+        )
+        gpt_output = response.choices[0].message.content.strip()
+        question_part, answer_line = extract_contextual_mcq_parts(gpt_output)
 
-    lines = question_part.split('\n')
-    choices = []
-    for line in lines:
-        m = re.match(r'^([أ-د][\)\-]?)\s*(.+)', line.strip())
-        if m:
-            choices.append(f"{m.group(1)}) {m.group(2)}")
-    underlined_word = extract_underlined_word(question_part)
+        # Basic validation - ensure we have both question and answer
+        if not question_part or not answer_line:
+            return None, None
 
-    filtered_choices = []
-    for c in choices:
-        m = re.match(r'^([أ-د][\)\-]?)\s*(.+)', c)
-        if m and underlined_word:
-            if not share_root(underlined_word, m.group(2)):
+        lines = question_part.split('\n')
+        choices = []
+        for line in lines:
+            m = re.match(r'^([أ-د][\)\-]?)\s*(.+)', line.strip())
+            if m:
+                choices.append(f"{m.group(1)}) {m.group(2)}")
+        
+        # Ensure we have at least 4 choices
+        if len(choices) < 4:
+            return None, None
+            
+        underlined_word = extract_underlined_word(question_part)
+
+        filtered_choices = []
+        for c in choices:
+            m = re.match(r'^([أ-د][\)\-]?)\s*(.+)', c)
+            if m and underlined_word:
+                if not share_root(underlined_word, m.group(2)):
+                    filtered_choices.append(c)
+            else:
                 filtered_choices.append(c)
-        else:
-            filtered_choices.append(c)
-    
-    filtered_choices = enforce_al_in_context_choices(filtered_choices, underlined_word)
-    question_lines = [l for l in lines if not re.match(r'^([أ-د][\)\-]?)\s*(.+)', l.strip())]
-    question_part_final = "\n".join(question_lines + filtered_choices)
-    return question_part_final.strip(), answer_line
+        
+        # If we filtered out too many choices, use original choices
+        if len(filtered_choices) < 4:
+            filtered_choices = choices
+            
+        filtered_choices = enforce_al_in_context_choices(filtered_choices, underlined_word)
+        question_lines = [l for l in lines if not re.match(r'^([أ-د][\)\-]?)\s*(.+)', l.strip())]
+        question_part_final = "\n".join(question_lines + filtered_choices)
+        return question_part_final.strip(), answer_line
+    except Exception as e:
+        return None, None
 
 def generate_contextual_test_llm(num_questions, reference_questions, grade):
     questions = []
-    max_attempts = num_questions * 6
+    max_attempts = num_questions * 15  # Increased attempts
     attempts = 0
+    
     while len(questions) < num_questions and attempts < max_attempts:
         attempts += 1
-        q, answer_line = generate_mcq_contextual_word_meaning(reference_questions, grade)
-        if q and answer_line:
-            questions.append((q, answer_line))
+        try:
+            q, answer_line = generate_mcq_contextual_word_meaning(reference_questions, grade)
+            if q and answer_line and len(q.strip()) > 50:  # Basic quality check
+                questions.append((q, answer_line))
+        except Exception as e:
+            continue  # Skip failed attempts and try again
+    
     return questions
