@@ -11,11 +11,11 @@ You are an expert in Arabic language assessment. For the given main word, genera
 2. THREE plausible distractors (words that could confuse students but are NOT synonyms)
 
 Instructions:
-- Do NOT include the main word itself
+- **CRITICAL**: Do NOT include the main word itself in any of the choices
 - The correct answer should be a true synonym or very close in meaning
 - The three distractors should be plausible but clearly different in meaning
 - Avoid words with the same root as the main word
-- **PREFERRED**: Try to ensure all four answer choices (correct answer + 3 distractors) have the same Arabic morphological pattern (وزن) and similar letter count when possible
+- **PREFERRED**: Try to ensure all four answer choices have the same Arabic morphological pattern (وزن) and similar letter count when possible
 - **FLEXIBILITY**: If better educational distractors are available that don't match the pattern, prioritize educational value over pattern consistency
 - The morphological pattern matching applies ONLY to the answer choices themselves, NOT to the main word
 - Format: You may list the words in any order - no need to list the correct answer first
@@ -55,6 +55,7 @@ CONTEXTUAL_PROMPT = """
 التعليمات:
 - أنشئ جملة تحتوي على كلمة واحدة مهمة (الكلمة المستهدفة يمكن أن تكون في أي مكان في الجملة)
 - أعطِ أربعة خيارات للإجابة (أ، ب، ج، د)
+- **CRITICAL**: Do NOT include the target word itself in any of the answer choices
 - خيار واحد فقط هو الصحيح (مرادف أو الأقرب معنى في السياق)
 - **PREFERRED**: Try to ensure all four answer choices have the same Arabic morphological pattern (وزن) and similar letter count when possible
 - **FLEXIBILITY**: If better educational distractors are available that don't match the pattern, prioritize educational value over pattern consistency
@@ -128,6 +129,12 @@ def share_root(word1, word2):
     w2 = normalize_al(word2)
     return w1[:3] == w2[:3] or w1[:4] == w2[:4]
 
+def words_are_same(word1, word2):
+    """Check if two words are the same, considering ال prefix"""
+    w1 = normalize_al(word1.strip())
+    w2 = normalize_al(word2.strip())
+    return w1.lower() == w2.lower()
+
 def clean_llm_response(response_text):
     """Remove common LLM introductory phrases and clean the response"""
     # Common Arabic introductory phrases to remove
@@ -164,40 +171,21 @@ def clean_llm_response(response_text):
     
     return '\n'.join(filtered_lines)
 
-def format_choices_with_line_breaks(question_text):
-    """Format choices so each appears on a new line for better readability"""
-    # Split the question into lines
-    lines = question_text.split('\n')
-    formatted_lines = []
+def filter_main_word_from_choices(choices, main_word):
+    """Remove any choice that matches the main word"""
+    filtered_choices = []
     
-    for line in lines:
-        line = line.strip()
-        if not line:
-            continue
+    for choice in choices:
+        # Extract just the word part (remove choice letters like أ) ب) etc.)
+        choice_word = choice
+        if re.match(r'^[أ-د][\)\-]', choice):
+            choice_word = re.sub(r'^[أ-د][\)\-]\s*', '', choice)
         
-        # Check if this line contains multiple choices (أ) ب) ج) د))
-        choice_pattern = r'([أ-د][\)\-])'
-        choices_in_line = re.findall(choice_pattern, line)
-        
-        if len(choices_in_line) > 1:
-            # Split multiple choices into separate lines
-            parts = re.split(choice_pattern, line)
-            current_choice = ""
-            
-            for i, part in enumerate(parts):
-                if re.match(r'[أ-د][\)\-]', part):
-                    if current_choice.strip():
-                        formatted_lines.append(current_choice.strip())
-                    current_choice = part
-                else:
-                    current_choice += part
-            
-            if current_choice.strip():
-                formatted_lines.append(current_choice.strip())
-        else:
-            formatted_lines.append(line)
+        # Check if this choice is the same as main word
+        if not words_are_same(choice_word, main_word):
+            filtered_choices.append(choice)
     
-    return '\n'.join(formatted_lines)
+    return filtered_choices
 
 def generate_mcq_arabic_word_meaning(main_word, reference_questions, grade):
     prompt = f"""{PROMPT_HEADER}
@@ -206,6 +194,7 @@ def generate_mcq_arabic_word_meaning(main_word, reference_questions, grade):
 أنشئ إجابة صحيحة واحدة (مرادف) وثلاثة مشتتات مناسبة للكلمة "{main_word}".
 حاول جعل الخيارات الأربعة لها نفس الوزن الصرفي عند الإمكان، لكن إذا كانت هناك مشتتات تعليمية أفضل بأوزان مختلفة، فاختر القيمة التعليمية.
 الخيارات لا تحتاج لنفس وزن الكلمة الرئيسية - ركز على جعل الخيارات الأربعة متسقة مع بعضها البعض أو ذات قيمة تعليمية عالية.
+**مهم جداً: لا تدرج الكلمة الرئيسية "{main_word}" نفسها في أي من الخيارات.**
 """
     
     response = client.chat.completions.create(
@@ -240,7 +229,14 @@ def generate_mcq_arabic_word_meaning(main_word, reference_questions, grade):
             elif line and not line.startswith("الكلمة") and not line.startswith("وزن"):
                 all_choices.append(line)
     
-    # Fallback if parsing fails
+    # **CRITICAL**: Filter out the main word from all choices
+    all_choices = [choice for choice in all_choices if not words_are_same(choice, main_word)]
+    
+    # Update correct_answer if it was filtered out
+    if correct_answer and words_are_same(correct_answer, main_word):
+        correct_answer = None
+    
+    # Fallback if parsing fails or main word was included
     if not correct_answer or len(all_choices) < 4:
         return generate_fallback_mcq(main_word, client)
     
@@ -255,6 +251,9 @@ def generate_mcq_arabic_word_meaning(main_word, reference_questions, grade):
     # Remove words with same root
     filtered_choices = [choice for choice in all_choices if not share_root(main_word, choice)]
     
+    # **DOUBLE CHECK**: Ensure main word is not in filtered choices
+    filtered_choices = [choice for choice in filtered_choices if not words_are_same(choice, main_word)]
+    
     # Ensure we have exactly 4 choices
     if len(filtered_choices) < 4:
         filtered_choices = all_choices[:4]
@@ -267,6 +266,13 @@ def generate_mcq_arabic_word_meaning(main_word, reference_questions, grade):
     else:
         correct_index = 0
         correct_answer = choices[0]
+    
+    # **FINAL CHECK**: Ensure no choice matches main word
+    choices = [choice for choice in choices if not words_are_same(choice, main_word)]
+    
+    # If we accidentally filtered out too many, generate new ones
+    if len(choices) < 4:
+        return generate_fallback_mcq(main_word, client)
     
     # Shuffle choices but keep track of correct answer position
     import random
@@ -291,6 +297,7 @@ def generate_fallback_mcq(main_word, client):
     3. حاول جعل الكلمات الأربعة لها نفس الوزن الصرفي عند الإمكان، لكن إذا كانت هناك مشتتات تعليمية أفضل بأوزان مختلفة، فاختر القيمة التعليمية
     4. الخيارات لا تحتاج لنفس وزن الكلمة الرئيسية - ركز على جعل الخيارات الأربعة متسقة مع بعضها البعض أو ذات قيمة تعليمية عالية
     
+    **مهم جداً: لا تدرج الكلمة الرئيسية "{main_word}" نفسها في أي من الخيارات.**
     استخدم نفس الشكل (مع أو بدون ال) مثل الكلمة الأصلية.
     اكتب كل كلمة في سطر منفصل.
     لا تكتب أي نص تمهيدي.
@@ -307,15 +314,19 @@ def generate_fallback_mcq(main_word, client):
     words = []
     for line in cleaned_output.split('\n'):
         word = line.strip()
-        if word and len(word.split()) == 1:
+        if word and len(word.split()) == 1 and not words_are_same(word, main_word):
             words.append(word)
     
     if len(words) < 4:
-        # Ultimate fallback
+        # Ultimate fallback - ensure these don't match main word
         if has_al(main_word):
-            words = ["الفهم", "الجهل", "السرعة", "القوة"]
+            fallback_words = ["الفهم", "الجهل", "السرعة", "القوة"]
         else:
-            words = ["فهم", "جهل", "سرعة", "قوة"]
+            fallback_words = ["فهم", "جهل", "سرعة", "قوة"]
+        
+        # Filter out any that match main word
+        fallback_words = [w for w in fallback_words if not words_are_same(w, main_word)]
+        words.extend(fallback_words)
     
     choices = words[:4]
     letters = ['أ', 'ب', 'ج', 'د']
@@ -398,12 +409,19 @@ def format_contextual_question(question_sentence, target_word, choices, correct_
     if not all([question_sentence, target_word, choices, correct_answer]):
         return None, None
     
+    # **CRITICAL**: Filter out target word from choices
+    filtered_choices = filter_main_word_from_choices(choices, target_word)
+    
+    # If we filtered out too many choices, we need to regenerate
+    if len(filtered_choices) < 4:
+        return None, None
+    
     # Format the question
     formatted_question = f"**السؤال:** {question_sentence}\n\n"
     formatted_question += f"**ما معنى كلمة \"{target_word}\" في السياق أعلاه؟**\n\n"
     
     # Add choices with proper formatting - each on a new line
-    for choice in choices:
+    for choice in filtered_choices[:4]:
         formatted_question += f"{choice}\n"
     
     # Format the answer
@@ -414,7 +432,7 @@ def format_contextual_question(question_sentence, target_word, choices, correct_
 def generate_mcq_contextual_word_meaning(reference_questions, grade):
     prompt = CONTEXTUAL_PROMPT + "\n\nيرجى توليد سؤال واحد فقط بالتنسيق المحدد أعلاه. لا تكتب أي نص تمهيدي."
     
-    max_retries = 3
+    max_retries = 5  # Increased retries
     for attempt in range(max_retries):
         try:
             response = client.chat.completions.create(
@@ -433,7 +451,7 @@ def generate_mcq_contextual_word_meaning(reference_questions, grade):
             if not all([question_sentence, target_word, choices, correct_answer]) or len(choices) < 4:
                 continue
             
-            # Format the question properly
+            # Format the question properly and filter main word
             formatted_question, formatted_answer = format_contextual_question(
                 question_sentence, target_word, choices, correct_answer
             )
@@ -448,7 +466,7 @@ def generate_mcq_contextual_word_meaning(reference_questions, grade):
 
 def generate_contextual_test_llm(num_questions, reference_questions, grade):
     questions = []
-    max_attempts = num_questions * 25  # Increased attempts significantly
+    max_attempts = num_questions * 30  # Increased attempts significantly
     attempts = 0
     
     while len(questions) < num_questions and attempts < max_attempts:
