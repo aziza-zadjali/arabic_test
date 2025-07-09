@@ -19,6 +19,7 @@ Instructions:
 - **FLEXIBILITY**: If better educational distractors are available that don't match the pattern, prioritize educational value over pattern consistency
 - The morphological pattern matching applies ONLY to the answer choices themselves, NOT to the main word
 - Format: You may list the words in any order - no need to list the correct answer first
+- IMPORTANT: Only provide the word list, no introductory text or explanations
 
 Examples showing different approaches:
 
@@ -38,22 +39,6 @@ Examples showing different approaches:
 نام
 خاف
 
-الكلمة الرئيسية: "ترويج"
-وزن الخيارات: تفعيل (pattern consistency prioritized)
-الخيارات:
-تسويق (صحيح)
-تغليف
-تنفيذ
-ترحيل
-
-الكلمة الرئيسية: "مآثر"
-وزن الخيارات: مفاعل (pattern consistency prioritized)
-الخيارات:
-محاسن (صحيح)
-مساكن
-مداخل
-مراجع
-
 الكلمة الرئيسية: "الأصل"
 وزن الخيارات: متنوع (educational value prioritized over pattern)
 الخيارات:
@@ -61,30 +46,6 @@ Examples showing different approaches:
 السحر
 الغروب
 الظهيرة
-
-الكلمة الرئيسية: "الدجى"
-وزن الخيارات: متنوع (educational value prioritized over pattern)
-الخيارات:
-الظلام (صحيح)
-الأصيل
-الشفق
-النور
-
-الكلمة الرئيسية: "عتيق"
-وزن الخيارات: متنوع (educational value prioritized over pattern)
-الخيارات:
-قديم (صحيح)
-حديث
-جميل
-عنيف
-
-الكلمة الرئيسية: "طأطأ"
-وزن الخيارات: متنوع (educational value prioritized over pattern)
-الخيارات:
-خفض (صحيح)
-رفع
-مال
-دفع
 """
 
 # --- Contextual Word Meaning MCQ (معنى الكلمة حسب السياق) ---
@@ -100,6 +61,7 @@ CONTEXTUAL_PROMPT = """
 - The morphological pattern matching applies ONLY to the answer choices themselves, NOT to the target word
 - لا تدرج كلمات تشترك في الجذر مع الكلمة المستهدفة
 - اكتب السؤال بوضوح مع الخيارات منفصلة
+- IMPORTANT: Only provide the question and choices, no introductory text or explanations
 
 تنسيق الإجابة المطلوب:
 السؤال: [الجملة هنا]
@@ -121,26 +83,6 @@ CONTEXTUAL_PROMPT = """
 ب) تعب
 ج) عبس
 د) سكت
-
-الإجابة الصحيحة: (ج)
-
-السؤال: يحظى المواطن بالحرية في بلاده
-ما معنى كلمة "يحظى" في السياق أعلاه؟
-
-أ) يدعو
-ب) يفرح
-ج) يحيى
-د) ينال
-
-الإجابة الصحيحة: (د)
-
-السؤال: بهرَ فلانٌ نظراءه
-ما معنى كلمة "بهر" في السياق أعلاه؟
-
-أ) سادَ
-ب) قادَ
-ج) فاقَ
-د) لامَ
 
 الإجابة الصحيحة: (ج)
 
@@ -178,41 +120,88 @@ CONTEXTUAL_PROMPT = """
 def has_al(word):
     return word.strip().startswith("ال")
 
-def ensure_al(words):
-    return [w if w.startswith("ال") else "ال" + w for w in words]
-
-def ensure_al_in_choices(choices):
-    ensured = []
-    for c in choices:
-        m = re.match(r'^([أ-د][\)\-]?)\s*(.+)', c)
-        if m:
-            label, word = m.group(1), m.group(2)
-            if not word.startswith("ال"):
-                word = "ال" + word
-            ensured.append(f"{label} {word}")
-        else:
-            ensured.append(c)
-    return ensured
-
 def normalize_al(word):
     return word[2:] if word.startswith("ال") else word
-
-def filter_by_length(words):
-    if not words:
-        return []
-    target_len = len(words[0])
-    filtered = [w for w in words if len(w) == target_len]
-    return filtered if len(filtered) >= 4 else words[:4]
 
 def share_root(word1, word2):
     w1 = normalize_al(word1)
     w2 = normalize_al(word2)
     return w1[:3] == w2[:3] or w1[:4] == w2[:4]
 
+def clean_llm_response(response_text):
+    """Remove common LLM introductory phrases and clean the response"""
+    # Common Arabic introductory phrases to remove
+    intro_phrases = [
+        "بالطبع، إليك",
+        "إليك قائمة",
+        "فيما يلي",
+        "هذه قائمة",
+        "بالتأكيد",
+        "نعم، يمكنني",
+        "سأقوم بتوليد",
+        "سأنشئ لك",
+        "إليك السؤال",
+        "هنا السؤال"
+    ]
+    
+    cleaned_text = response_text.strip()
+    
+    # Remove lines that contain introductory phrases
+    lines = cleaned_text.split('\n')
+    filtered_lines = []
+    
+    for line in lines:
+        line = line.strip()
+        should_keep = True
+        
+        for phrase in intro_phrases:
+            if phrase in line and len(line) > 50:  # Long lines likely contain intro text
+                should_keep = False
+                break
+        
+        if should_keep and line:
+            filtered_lines.append(line)
+    
+    return '\n'.join(filtered_lines)
+
+def format_choices_with_line_breaks(question_text):
+    """Format choices so each appears on a new line for better readability"""
+    # Split the question into lines
+    lines = question_text.split('\n')
+    formatted_lines = []
+    
+    for line in lines:
+        line = line.strip()
+        if not line:
+            continue
+        
+        # Check if this line contains multiple choices (أ) ب) ج) د))
+        choice_pattern = r'([أ-د][\)\-])'
+        choices_in_line = re.findall(choice_pattern, line)
+        
+        if len(choices_in_line) > 1:
+            # Split multiple choices into separate lines
+            parts = re.split(choice_pattern, line)
+            current_choice = ""
+            
+            for i, part in enumerate(parts):
+                if re.match(r'[أ-د][\)\-]', part):
+                    if current_choice.strip():
+                        formatted_lines.append(current_choice.strip())
+                    current_choice = part
+                else:
+                    current_choice += part
+            
+            if current_choice.strip():
+                formatted_lines.append(current_choice.strip())
+        else:
+            formatted_lines.append(line)
+    
+    return '\n'.join(formatted_lines)
+
 def generate_mcq_arabic_word_meaning(main_word, reference_questions, grade):
     prompt = f"""{PROMPT_HEADER}
 الكلمة الرئيسية: "{main_word}"
-الأسئلة المرجعية: {reference_questions[:3]}
 
 أنشئ إجابة صحيحة واحدة (مرادف) وثلاثة مشتتات مناسبة للكلمة "{main_word}".
 حاول جعل الخيارات الأربعة لها نفس الوزن الصرفي عند الإمكان، لكن إذا كانت هناك مشتتات تعليمية أفضل بأوزان مختلفة، فاختر القيمة التعليمية.
@@ -228,11 +217,14 @@ def generate_mcq_arabic_word_meaning(main_word, reference_questions, grade):
     
     gpt_output = response.choices[0].message.content.strip()
     
+    # Clean the response to remove introductory text
+    cleaned_output = clean_llm_response(gpt_output)
+    
     # Extract choices and identify correct answer
     correct_answer = None
     all_choices = []
     
-    lines = gpt_output.split('\n')
+    lines = cleaned_output.split('\n')
     collecting_choices = False
     
     for line in lines:
@@ -283,6 +275,8 @@ def generate_mcq_arabic_word_meaning(main_word, reference_questions, grade):
     
     letters = ['أ', 'ب', 'ج', 'د']
     display_choices = [f"{letters[i]}) {choices[i]}" for i in range(4)]
+    
+    # Format question with proper line breaks for each choice
     question = f"ما معنى كلمة \"{main_word}\"؟\n\n" + "\n".join(display_choices)
     answer = display_choices[correct_index]
     
@@ -299,6 +293,7 @@ def generate_fallback_mcq(main_word, client):
     
     استخدم نفس الشكل (مع أو بدون ال) مثل الكلمة الأصلية.
     اكتب كل كلمة في سطر منفصل.
+    لا تكتب أي نص تمهيدي.
     """
     
     response = client.chat.completions.create(
@@ -308,8 +303,9 @@ def generate_fallback_mcq(main_word, client):
         max_tokens=150,
     )
     
+    cleaned_output = clean_llm_response(response.choices[0].message.content.strip())
     words = []
-    for line in response.choices[0].message.content.strip().split('\n'):
+    for line in cleaned_output.split('\n'):
         word = line.strip()
         if word and len(word.split()) == 1:
             words.append(word)
@@ -335,10 +331,10 @@ def generate_meaning_test_llm(num_questions, reference_questions, grade):
     max_attempts = num_questions * 10
     attempts = 0
     
+    # Updated prompt to avoid introductory text
     prompt = (
-        f"اقترح قائمة من 15 كلمة عربية مناسبة لاختبار معاني الكلمات للصف {grade} "
-        "يُفضل أن تكون الكلمات شائعة في مناهج هذا الصف، وليست أسماء أعلام أو كلمات تخصصية."
-        "اكتب كل كلمة في سطر منفصل، ولا تكرر الكلمات."
+        f"اكتب 15 كلمة عربية مناسبة لاختبار معاني الكلمات للصف {grade}. "
+        "كل كلمة في سطر منفصل. لا تكتب أي نص تمهيدي أو تفسيري."
     )
     
     response = client.chat.completions.create(
@@ -348,7 +344,8 @@ def generate_meaning_test_llm(num_questions, reference_questions, grade):
         max_tokens=100,
     )
     
-    candidate_words = [w.strip() for w in response.choices[0].message.content.strip().split('\n') if w.strip()]
+    cleaned_output = clean_llm_response(response.choices[0].message.content.strip())
+    candidate_words = [w.strip() for w in cleaned_output.split('\n') if w.strip()]
     
     for main_word in candidate_words:
         if len(questions) >= num_questions:
@@ -365,7 +362,9 @@ def generate_meaning_test_llm(num_questions, reference_questions, grade):
 # --- Contextual Word Meaning MCQ (معنى الكلمة حسب السياق) ---
 def parse_contextual_response(gpt_output):
     """Parse the structured contextual response"""
-    lines = gpt_output.strip().split('\n')
+    # Clean the response first
+    cleaned_output = clean_llm_response(gpt_output)
+    lines = cleaned_output.strip().split('\n')
     
     question_sentence = ""
     target_word = ""
@@ -395,7 +394,7 @@ def parse_contextual_response(gpt_output):
     return question_sentence, target_word, choices, correct_answer
 
 def format_contextual_question(question_sentence, target_word, choices, correct_answer):
-    """Format the contextual question properly"""
+    """Format the contextual question properly with line breaks"""
     if not all([question_sentence, target_word, choices, correct_answer]):
         return None, None
     
@@ -403,7 +402,7 @@ def format_contextual_question(question_sentence, target_word, choices, correct_
     formatted_question = f"**السؤال:** {question_sentence}\n\n"
     formatted_question += f"**ما معنى كلمة \"{target_word}\" في السياق أعلاه؟**\n\n"
     
-    # Add choices with proper formatting
+    # Add choices with proper formatting - each on a new line
     for choice in choices:
         formatted_question += f"{choice}\n"
     
@@ -413,7 +412,7 @@ def format_contextual_question(question_sentence, target_word, choices, correct_
     return formatted_question.strip(), formatted_answer
 
 def generate_mcq_contextual_word_meaning(reference_questions, grade):
-    prompt = CONTEXTUAL_PROMPT + "\n\nيرجى توليد سؤال واحد فقط بالتنسيق المحدد أعلاه."
+    prompt = CONTEXTUAL_PROMPT + "\n\nيرجى توليد سؤال واحد فقط بالتنسيق المحدد أعلاه. لا تكتب أي نص تمهيدي."
     
     max_retries = 3
     for attempt in range(max_retries):
@@ -458,7 +457,6 @@ def generate_contextual_test_llm(num_questions, reference_questions, grade):
             q, answer_line = generate_mcq_contextual_word_meaning(reference_questions, grade)
             if q and answer_line:
                 questions.append((q, answer_line))
-                print(f"Generated question {len(questions)}/{num_questions}")  # Debug output
         except Exception as e:
             continue
     
