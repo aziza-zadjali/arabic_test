@@ -4,7 +4,7 @@ from config import get_openai_api_key
 
 client = openai.OpenAI(api_key=get_openai_api_key())
 
-# --- Fixed Word Meaning MCQ (معاني الكلمات) ---
+# --- Word Meaning MCQ (معاني الكلمات) ---
 PROMPT_HEADER = """
 You are an expert in Arabic language assessment. For the given main word, generate:
 1. ONE correct synonym (closest in meaning)
@@ -15,16 +15,70 @@ Instructions:
 - The correct answer should be a true synonym or very close in meaning
 - The three distractors should be plausible but clearly different in meaning
 - Avoid words with the same root as the main word
-- Preferably use the same morphological pattern (وزن) and similar letter count
-- Format: List the correct answer first, then the three distractors
+- **VERY IMPORTANT**: Try your absolute best to ensure all four answer choices (correct answer + 3 distractors) have the same Arabic morphological pattern (وزن) and similar letter count. This is a high priority requirement.
+- The morphological pattern matching applies only to the answer choices themselves, not to the main word
+- Format: You may list the words in any order - no need to list the correct answer first
 
 Example format:
 الكلمة الرئيسية: "الشجاعة"
-الإجابة الصحيحة: البسالة
-المشتتات:
-الجبانة
-الحكمة
-السرعة
+وزن الخيارات: فعالة
+الخيارات:
+البسالة (صحيح)
+الجهالة
+الكسالة  
+الرشالة
+
+الكلمة الرئيسية: "يفهم"
+وزن الخيارات: يفعل
+الخيارات:
+يدرك (صحيح)
+يهرب
+يلعب
+يكتب
+
+Examples (use this format exactly):
+
+وزن: تفعيل
+كلمات:
+تسويق
+تغليف
+تنفيذ
+ترحيل
+
+وزن: مفاعل
+كلمات:
+مآثر
+مداخل
+مراجع
+محاسن
+
+الكلمة الرئيسية: "الأصل"
+الخيارات:
+الصباح
+السحر
+الغروب
+الظهيرة
+
+الكلمة الرئيسية: "الدجى"
+الخيارات:
+الأصيل
+الظلام
+الشفق
+النور
+
+الكلمة الرئيسية: "الخضوع"
+الخيارات:
+الجحود
+القعود
+الركوع
+الخشوع
+
+الكلمة الرئيسية: "برع"
+الخيارات:
+فاق
+رام
+نام
+خاف
 """
 
 # --- Contextual Word Meaning MCQ (معنى الكلمة حسب السياق) ---
@@ -37,7 +91,8 @@ CONTEXTUAL_PROMPT = """
 - أعطِ أربعة خيارات للإجابة (أ، ب، ج، د).
 - خيار واحد فقط هو الصحيح (مرادف أو الأقرب معنى في السياق).
 - وضّح رمز الإجابة الصحيحة في نهاية السؤال.
-- يُفضّل أن تكون جميع البدائل على نفس الوزن وعدد الحروف بعضها مع بعض (لكن ليس بالضرورة نفس الكلمة الرئيسية أو الكلمة التي تحتها خط). إذا لم يكن ذلك ممكنًا، يمكنك تخفيف هذا الشرط وتقديم أفضل مجموعة متاحة من البدائل.
+- **VERY IMPORTANT**: Try your absolute best to ensure all four answer choices have the same Arabic morphological pattern (وزن) and similar letter count. This is a high priority requirement.
+- The morphological pattern matching applies only to the answer choices themselves, not to the underlined word
 - لا تدرج كلمات تشترك في الجذر مع الكلمة التي تحتها خط.
 
 أمثلة:
@@ -132,6 +187,7 @@ def generate_mcq_arabic_word_meaning(main_word, reference_questions, grade):
 الأسئلة المرجعية: {reference_questions[:3]}
 
 أنشئ إجابة صحيحة واحدة (مرادف) وثلاثة مشتتات مناسبة للكلمة "{main_word}".
+تأكد من أن جميع الخيارات الأربعة لها نفس الوزن الصرفي وعدد الحروف المتشابه.
 """
     
     response = client.chat.completions.create(
@@ -143,48 +199,56 @@ def generate_mcq_arabic_word_meaning(main_word, reference_questions, grade):
     
     gpt_output = response.choices[0].message.content.strip()
     
-    # Extract correct answer and distractors
+    # Extract choices and identify correct answer
     correct_answer = None
-    distractors = []
+    all_choices = []
     
     lines = gpt_output.split('\n')
-    collecting_distractors = False
+    collecting_choices = False
     
     for line in lines:
         line = line.strip()
-        if line.startswith("الإجابة الصحيحة:"):
-            correct_answer = line.split(":", 1)[1].strip()
-        elif line.startswith("المشتتات:"):
-            collecting_distractors = True
-        elif collecting_distractors and line and not line.startswith("الكلمة"):
-            word = line.replace('-', '').replace('–', '').replace('—', '').strip()
-            if word and len(word.split()) == 1:
-                distractors.append(word)
+        if line.startswith("الخيارات:"):
+            collecting_choices = True
+            continue
+        elif collecting_choices and line:
+            # Check if this line contains the correct answer marker
+            if "(صحيح)" in line:
+                correct_answer = line.replace("(صحيح)", "").strip()
+                all_choices.append(correct_answer)
+            elif line and not line.startswith("الكلمة") and not line.startswith("وزن"):
+                all_choices.append(line)
     
     # Fallback if parsing fails
-    if not correct_answer or len(distractors) < 3:
+    if not correct_answer or len(all_choices) < 4:
         return generate_fallback_mcq(main_word, client)
     
     # Ensure consistent "ال" usage
     if has_al(main_word):
         correct_answer = correct_answer if correct_answer.startswith("ال") else "ال" + correct_answer
-        distractors = [d if d.startswith("ال") else "ال" + d for d in distractors]
+        all_choices = [choice if choice.startswith("ال") else "ال" + choice for choice in all_choices]
     else:
         correct_answer = correct_answer[2:] if correct_answer.startswith("ال") else correct_answer
-        distractors = [d[2:] if d.startswith("ال") else d for d in distractors]
+        all_choices = [choice[2:] if choice.startswith("ال") else choice for choice in all_choices]
     
     # Remove words with same root
-    distractors = [d for d in distractors if not share_root(main_word, d)][:3]
+    filtered_choices = [choice for choice in all_choices if not share_root(main_word, choice)]
     
     # Ensure we have exactly 4 choices
-    choices = [correct_answer] + distractors
-    while len(choices) < 4:
-        fallback_word = "الخير" if has_al(main_word) else "خير"
-        choices.append(fallback_word)
+    if len(filtered_choices) < 4:
+        filtered_choices = all_choices[:4]
+    
+    choices = filtered_choices[:4]
+    
+    # Find correct answer in filtered choices, or use first as fallback
+    if correct_answer in choices:
+        correct_index = choices.index(correct_answer)
+    else:
+        correct_index = 0
+        correct_answer = choices[0]
     
     # Shuffle choices but keep track of correct answer position
     import random
-    correct_index = 0
     random.shuffle(choices)
     correct_index = choices.index(correct_answer)
     
@@ -201,6 +265,7 @@ def generate_fallback_mcq(main_word, client):
     للكلمة العربية "{main_word}":
     1. اكتب مرادف واحد صحيح
     2. اكتب 3 كلمات مختلفة المعنى كمشتتات
+    3. تأكد من أن جميع الكلمات الأربعة لها نفس الوزن الصرفي وعدد الحروف المتشابه
     
     استخدم نفس الشكل (مع أو بدون ال) مثل الكلمة الأصلية.
     اكتب كل كلمة في سطر منفصل.
