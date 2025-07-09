@@ -18,6 +18,7 @@ Instructions:
 - **PREFERRED**: Try to ensure all four answer choices have the same Arabic morphological pattern (وزن) and similar letter count when possible
 - **FLEXIBILITY**: If better educational distractors are available that don't match the pattern, prioritize educational value over pattern consistency
 - The morphological pattern matching applies ONLY to the answer choices themselves, NOT to the main word
+- **IMPORTANT**: Match the definite article (ال) usage of the main word - if main word has no ال, choices should not have ال unless it's integral to the word
 - Format: You may list the words in any order - no need to list the correct answer first
 - IMPORTANT: Only provide the word list, no introductory text or explanations
 
@@ -38,6 +39,14 @@ Examples showing different approaches:
 رام
 نام
 خاف
+
+الكلمة الرئيسية: "مآثر"
+وزن الخيارات: مفاعل (pattern consistency prioritized)
+الخيارات:
+مفاخر (صحيح)
+مصاعب
+مخاطر
+منازل
 
 الكلمة الرئيسية: "الأصل"
 وزن الخيارات: متنوع (educational value prioritized over pattern)
@@ -60,6 +69,7 @@ CONTEXTUAL_PROMPT = """
 - **PREFERRED**: Try to ensure all four answer choices have the same Arabic morphological pattern (وزن) and similar letter count when possible
 - **FLEXIBILITY**: If better educational distractors are available that don't match the pattern, prioritize educational value over pattern consistency
 - The morphological pattern matching applies ONLY to the answer choices themselves, NOT to the target word
+- **IMPORTANT**: Match the definite article (ال) usage appropriately - don't force ال on choices unless contextually appropriate
 - لا تدرج كلمات تشترك في الجذر مع الكلمة المستهدفة
 - اكتب السؤال بوضوح مع الخيارات منفصلة
 - IMPORTANT: Only provide the question and choices, no introductory text or explanations
@@ -168,39 +178,37 @@ def clean_llm_response(response_text):
     
     return '\n'.join(filtered_lines)
 
-def format_question_with_line_breaks(question_text):
-    """Format question to ensure each choice is on a separate line"""
-    lines = question_text.split('\n')
-    formatted_lines = []
+def normalize_al_consistency(choices, main_word):
+    """Ensure ال consistency based on main word usage"""
+    main_has_al = has_al(main_word)
+    normalized_choices = []
     
-    for line in lines:
-        line = line.strip()
-        if not line:
-            continue
+    for choice in choices:
+        choice = choice.strip()
         
-        # Check if this line contains multiple choices
-        choice_pattern = r'([أ-د][\)\-])'
-        choices_in_line = re.findall(choice_pattern, line)
-        
-        if len(choices_in_line) > 1:
-            # Split multiple choices into separate lines
-            parts = re.split(choice_pattern, line)
-            current_choice = ""
-            
-            for i, part in enumerate(parts):
-                if re.match(r'[أ-د][\)\-]', part):
-                    if current_choice.strip():
-                        formatted_lines.append(current_choice.strip())
-                    current_choice = part
-                else:
-                    current_choice += part
-            
-            if current_choice.strip():
-                formatted_lines.append(current_choice.strip())
+        if main_has_al:
+            # Main word has ال, so choices should have ال unless they naturally don't
+            if not choice.startswith("ال"):
+                # Only add ال if it makes linguistic sense
+                # Some words naturally don't take ال (proper nouns, some patterns)
+                normalized_choices.append("ال" + choice)
+            else:
+                normalized_choices.append(choice)
         else:
-            formatted_lines.append(line)
+            # Main word doesn't have ال, so choices should not have ال
+            if choice.startswith("ال"):
+                # Remove ال unless it's integral to the word
+                # Check if removing ال creates a valid word
+                without_al = choice[2:]
+                if len(without_al) > 2:  # Ensure it's still a meaningful word
+                    normalized_choices.append(without_al)
+                else:
+                    # Keep ال if removing it makes the word too short/invalid
+                    normalized_choices.append(choice)
+            else:
+                normalized_choices.append(choice)
     
-    return '\n'.join(formatted_lines)
+    return normalized_choices
 
 def generate_mcq_arabic_word_meaning(main_word, reference_questions, grade):
     prompt = f"""{PROMPT_HEADER}
@@ -209,6 +217,7 @@ def generate_mcq_arabic_word_meaning(main_word, reference_questions, grade):
 أنشئ إجابة صحيحة واحدة (مرادف) وثلاثة مشتتات مناسبة للكلمة "{main_word}".
 حاول جعل الخيارات الأربعة لها نفس الوزن الصرفي عند الإمكان، لكن إذا كانت هناك مشتتات تعليمية أفضل بأوزان مختلفة، فاختر القيمة التعليمية.
 **مهم جداً: لا تدرج الكلمة الرئيسية "{main_word}" نفسها في أي من الخيارات.**
+**مهم: اتبع نفس استخدام "ال" كما في الكلمة الرئيسية - إذا كانت الكلمة الرئيسية بدون "ال" فالخيارات يجب أن تكون بدون "ال" أيضاً.**
 """
     
     response = client.chat.completions.create(
@@ -250,13 +259,10 @@ def generate_mcq_arabic_word_meaning(main_word, reference_questions, grade):
     if not correct_answer or len(all_choices) < 4:
         return generate_fallback_mcq(main_word, client)
     
-    # Ensure consistent "ال" usage
-    if has_al(main_word):
-        correct_answer = correct_answer if correct_answer.startswith("ال") else "ال" + correct_answer
-        all_choices = [choice if choice.startswith("ال") else "ال" + choice for choice in all_choices]
-    else:
-        correct_answer = correct_answer[2:] if correct_answer.startswith("ال") else correct_answer
-        all_choices = [choice[2:] if choice.startswith("ال") else choice for choice in all_choices]
+    # **FIXED**: Apply proper ال consistency based on main word
+    all_choices = normalize_al_consistency(all_choices, main_word)
+    if correct_answer:
+        correct_answer = normalize_al_consistency([correct_answer], main_word)[0]
     
     # Remove words with same root and ensure no main word
     filtered_choices = [choice for choice in all_choices if not share_root(main_word, choice) and not words_are_same(choice, main_word)]
@@ -301,7 +307,7 @@ def generate_fallback_mcq(main_word, client):
     2. اكتب 3 كلمات مختلفة المعنى كمشتتات
     
     **مهم جداً: لا تدرج الكلمة الرئيسية "{main_word}" نفسها في أي من الخيارات.**
-    استخدم نفس الشكل (مع أو بدون ال) مثل الكلمة الأصلية.
+    **مهم: اتبع نفس استخدام "ال" كما في الكلمة الرئيسية.**
     اكتب كل كلمة في سطر منفصل.
     لا تكتب أي نص تمهيدي.
     """
@@ -320,8 +326,11 @@ def generate_fallback_mcq(main_word, client):
         if word and len(word.split()) == 1 and not words_are_same(word, main_word):
             words.append(word)
     
+    # Apply ال consistency
+    words = normalize_al_consistency(words, main_word)
+    
     if len(words) < 4:
-        # Ultimate fallback
+        # Ultimate fallback with proper ال handling
         if has_al(main_word):
             fallback_words = ["الفهم", "الجهل", "السرعة", "القوة"]
         else:
@@ -404,7 +413,7 @@ def parse_contextual_response(gpt_output):
     return question_sentence, target_word, choices, correct_answer
 
 def format_contextual_question(question_sentence, target_word, choices, correct_answer):
-    """Format the contextual question properly with line breaks"""
+    """Format the contextual question properly with line breaks and ال consistency"""
     if not all([question_sentence, target_word, choices, correct_answer]):
         return None, None
     
@@ -421,12 +430,30 @@ def format_contextual_question(question_sentence, target_word, choices, correct_
     if len(filtered_choices) < 4:
         return None, None
     
+    # **NEW**: Apply ال consistency to contextual choices based on target word
+    choice_words = []
+    choice_labels = []
+    
+    for choice in filtered_choices[:4]:
+        match = re.match(r'^([أ-د][\)\-]?)\s*(.+)', choice)
+        if match:
+            choice_labels.append(match.group(1))
+            choice_words.append(match.group(2))
+    
+    # Apply ال consistency
+    normalized_choice_words = normalize_al_consistency(choice_words, target_word)
+    
+    # Reconstruct choices with proper formatting
+    formatted_choices = []
+    for i, (label, word) in enumerate(zip(choice_labels, normalized_choice_words)):
+        formatted_choices.append(f"{label}) {word}")
+    
     # Format the question with proper spacing and line breaks
     formatted_question = f"**السؤال:** {question_sentence}\n\n"
     formatted_question += f"**ما معنى كلمة \"{target_word}\" في السياق أعلاه؟**\n\n"
     
     # Add choices with proper formatting - each on a new line
-    for choice in filtered_choices[:4]:
+    for choice in formatted_choices:
         formatted_question += f"{choice}\n"
     
     formatted_answer = f"الإجابة الصحيحة: ({correct_answer})"
