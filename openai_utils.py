@@ -383,6 +383,24 @@ def enforce_al_in_context_choices(choices, underlined_word):
             ensured.append(c)
     return ensured
 
+def format_contextual_question(question_text):
+    """Format contextual question for better readability"""
+    lines = question_text.split('\n')
+    formatted_lines = []
+    
+    for line in lines:
+        line = line.strip()
+        if not line:
+            continue
+            
+        # Check if it's a choice line (starts with أ- ب- ج- د-)
+        if re.match(r'^[أ-د][\)\-]', line):
+            formatted_lines.append(f"  {line}")
+        else:
+            formatted_lines.append(line)
+    
+    return '\n'.join(formatted_lines)
+
 def generate_mcq_contextual_word_meaning(reference_questions, grade):
     prompt = CONTEXTUAL_PROMPT + "\n\nيرجى توليد سؤال واحد فقط بالتنسيق أعلاه."
     try:
@@ -401,10 +419,19 @@ def generate_mcq_contextual_word_meaning(reference_questions, grade):
 
         lines = question_part.split('\n')
         choices = []
+        question_lines = []
+        
         for line in lines:
-            m = re.match(r'^([أ-د][\)\-]?)\s*(.+)', line.strip())
+            line = line.strip()
+            if not line:
+                continue
+                
+            # Check if it's a choice line
+            m = re.match(r'^([أ-د][\)\-]?)\s*(.+)', line)
             if m:
                 choices.append(f"{m.group(1)}) {m.group(2)}")
+            else:
+                question_lines.append(line)
         
         # Ensure we have at least 4 choices
         if len(choices) < 4:
@@ -426,15 +453,17 @@ def generate_mcq_contextual_word_meaning(reference_questions, grade):
             filtered_choices = choices
             
         filtered_choices = enforce_al_in_context_choices(filtered_choices, underlined_word)
-        question_lines = [l for l in lines if not re.match(r'^([أ-د][\)\-]?)\s*(.+)', l.strip())]
-        question_part_final = "\n".join(question_lines + filtered_choices)
-        return question_part_final.strip(), answer_line
+        
+        # Format the final question with proper line breaks
+        formatted_question = '\n'.join(question_lines) + '\n\n' + '\n'.join(filtered_choices)
+        
+        return formatted_question.strip(), answer_line
     except Exception as e:
         return None, None
 
 def generate_contextual_test_llm(num_questions, reference_questions, grade):
     questions = []
-    max_attempts = num_questions * 15  # Increased attempts
+    max_attempts = num_questions * 20  # Increased attempts to ensure we get the requested number
     attempts = 0
     
     while len(questions) < num_questions and attempts < max_attempts:
