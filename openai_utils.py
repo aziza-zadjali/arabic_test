@@ -92,12 +92,12 @@ CONTEXTUAL_PROMPT = """
 أنت خبير في إعداد أسئلة اللغة العربية. أنشئ سؤال اختيار من متعدد لمعنى كلمة في سياق جملة.
 
 التعليمات:
-- أنشئ جملة تحتوي على كلمة واحدة مهمة (لا تضع خط تحتها)
+- أنشئ جملة تحتوي على كلمة واحدة مهمة (الكلمة المستهدفة يمكن أن تكون في أي مكان في الجملة)
 - أعطِ أربعة خيارات للإجابة (أ، ب، ج، د)
 - خيار واحد فقط هو الصحيح (مرادف أو الأقرب معنى في السياق)
 - **PREFERRED**: Try to ensure all four answer choices have the same Arabic morphological pattern (وزن) and similar letter count when possible
 - **FLEXIBILITY**: If better educational distractors are available that don't match the pattern, prioritize educational value over pattern consistency
-- The morphological pattern matching applies ONLY to the answer choices themselves, NOT to the word in context
+- The morphological pattern matching applies ONLY to the answer choices themselves, NOT to the target word
 - لا تدرج كلمات تشترك في الجذر مع الكلمة المستهدفة
 - اكتب السؤال بوضوح مع الخيارات منفصلة
 
@@ -143,6 +143,36 @@ CONTEXTUAL_PROMPT = """
 د) لامَ
 
 الإجابة الصحيحة: (ج)
+
+السؤال: والليل إذا عسعس
+ما معنى كلمة "عسعس" في السياق أعلاه؟
+
+أ) طال
+ب) أظلم
+ج) قصر
+د) أمطر
+
+الإجابة الصحيحة: (ب)
+
+السؤال: انبثق الماء غزيرا
+ما معنى كلمة "انبثق" في السياق أعلاه؟
+
+أ) انحصر
+ب) انتشر
+ج) انقطع
+د) اندفع
+
+الإجابة الصحيحة: (د)
+
+السؤال: اشرأبت الزرافات بأعناقها
+ما معنى كلمة "اشرأبت" في السياق أعلاه؟
+
+أ) امتدّت
+ب) اشتدّت
+ج) قصرت
+د) ابتهجت
+
+الإجابة الصحيحة: (أ)
 """
 
 def has_al(word):
