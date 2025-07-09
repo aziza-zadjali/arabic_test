@@ -15,70 +15,76 @@ Instructions:
 - The correct answer should be a true synonym or very close in meaning
 - The three distractors should be plausible but clearly different in meaning
 - Avoid words with the same root as the main word
-- **VERY IMPORTANT**: Try your absolute best to ensure all four answer choices (correct answer + 3 distractors) have the same Arabic morphological pattern (وزن) and similar letter count. This is a high priority requirement.
-- The morphological pattern matching applies only to the answer choices themselves, not to the main word
+- **PREFERRED**: Try to ensure all four answer choices (correct answer + 3 distractors) have the same Arabic morphological pattern (وزن) and similar letter count when possible
+- **FLEXIBILITY**: If better educational distractors are available that don't match the pattern, prioritize educational value over pattern consistency
+- The morphological pattern matching applies ONLY to the answer choices themselves, NOT to the main word
 - Format: You may list the words in any order - no need to list the correct answer first
 
-Example format:
-الكلمة الرئيسية: "الشجاعة"
-وزن الخيارات: فعالة
+Examples showing different approaches:
+
+الكلمة الرئيسية: "الخضوع"
+وزن الخيارات: فعول (pattern consistency prioritized)
 الخيارات:
-البسالة (صحيح)
-الجهالة
-الكسالة  
-الرشالة
+الخشوع (صحيح)
+الجحود
+القعود
+الركوع
 
-الكلمة الرئيسية: "يفهم"
-وزن الخيارات: يفعل
+الكلمة الرئيسية: "برع"
+وزن الخيارات: فعل (pattern consistency prioritized)
 الخيارات:
-يدرك (صحيح)
-يهرب
-يلعب
-يكتب
+فاق (صحيح)
+رام
+نام
+خاف
 
-Examples (use this format exactly):
-
-وزن: تفعيل
-كلمات:
-تسويق
+الكلمة الرئيسية: "ترويج"
+وزن الخيارات: تفعيل (pattern consistency prioritized)
+الخيارات:
+تسويق (صحيح)
 تغليف
 تنفيذ
 ترحيل
 
-وزن: مفاعل
-كلمات:
-مآثر
+الكلمة الرئيسية: "مآثر"
+وزن الخيارات: مفاعل (pattern consistency prioritized)
+الخيارات:
+محاسن (صحيح)
+مساكن
 مداخل
 مراجع
-محاسن
 
 الكلمة الرئيسية: "الأصل"
+وزن الخيارات: متنوع (educational value prioritized over pattern)
 الخيارات:
-الصباح
+الصباح (صحيح - time reference)
 السحر
 الغروب
 الظهيرة
 
 الكلمة الرئيسية: "الدجى"
+وزن الخيارات: متنوع (educational value prioritized over pattern)
 الخيارات:
+الظلام (صحيح)
 الأصيل
-الظلام
 الشفق
 النور
 
-الكلمة الرئيسية: "الخضوع"
+الكلمة الرئيسية: "عتيق"
+وزن الخيارات: متنوع (educational value prioritized over pattern)
 الخيارات:
-الجحود
-القعود
-الركوع
-الخشوع
+قديم (صحيح)
+حديث
+جميل
+عنيف
 
-الكلمة الرئيسية: "برع"
+الكلمة الرئيسية: "طأطأ"
+وزن الخيارات: متنوع (educational value prioritized over pattern)
 الخيارات:
-فاق
-رام
-نام
-خاف
+خفض (صحيح)
+رفع
+مال
+دفع
 """
 
 # --- Contextual Word Meaning MCQ (معنى الكلمة حسب السياق) ---
@@ -91,8 +97,9 @@ CONTEXTUAL_PROMPT = """
 - أعطِ أربعة خيارات للإجابة (أ، ب، ج، د).
 - خيار واحد فقط هو الصحيح (مرادف أو الأقرب معنى في السياق).
 - وضّح رمز الإجابة الصحيحة في نهاية السؤال.
-- **VERY IMPORTANT**: Try your absolute best to ensure all four answer choices have the same Arabic morphological pattern (وزن) and similar letter count. This is a high priority requirement.
-- The morphological pattern matching applies only to the answer choices themselves, not to the underlined word
+- **PREFERRED**: Try to ensure all four answer choices have the same Arabic morphological pattern (وزن) and similar letter count when possible
+- **FLEXIBILITY**: If better educational distractors are available that don't match the pattern, prioritize educational value over pattern consistency
+- The morphological pattern matching applies ONLY to the answer choices themselves, NOT to the underlined word
 - لا تدرج كلمات تشترك في الجذر مع الكلمة التي تحتها خط.
 
 أمثلة:
@@ -187,7 +194,8 @@ def generate_mcq_arabic_word_meaning(main_word, reference_questions, grade):
 الأسئلة المرجعية: {reference_questions[:3]}
 
 أنشئ إجابة صحيحة واحدة (مرادف) وثلاثة مشتتات مناسبة للكلمة "{main_word}".
-تأكد من أن جميع الخيارات الأربعة لها نفس الوزن الصرفي وعدد الحروف المتشابه.
+حاول جعل الخيارات الأربعة لها نفس الوزن الصرفي عند الإمكان، لكن إذا كانت هناك مشتتات تعليمية أفضل بأوزان مختلفة، فاختر القيمة التعليمية.
+الخيارات لا تحتاج لنفس وزن الكلمة الرئيسية - ركز على جعل الخيارات الأربعة متسقة مع بعضها البعض أو ذات قيمة تعليمية عالية.
 """
     
     response = client.chat.completions.create(
@@ -265,7 +273,8 @@ def generate_fallback_mcq(main_word, client):
     للكلمة العربية "{main_word}":
     1. اكتب مرادف واحد صحيح
     2. اكتب 3 كلمات مختلفة المعنى كمشتتات
-    3. تأكد من أن جميع الكلمات الأربعة لها نفس الوزن الصرفي وعدد الحروف المتشابه
+    3. حاول جعل الكلمات الأربعة لها نفس الوزن الصرفي عند الإمكان، لكن إذا كانت هناك مشتتات تعليمية أفضل بأوزان مختلفة، فاختر القيمة التعليمية
+    4. الخيارات لا تحتاج لنفس وزن الكلمة الرئيسية - ركز على جعل الخيارات الأربعة متسقة مع بعضها البعض أو ذات قيمة تعليمية عالية
     
     استخدم نفس الشكل (مع أو بدون ال) مثل الكلمة الأصلية.
     اكتب كل كلمة في سطر منفصل.
