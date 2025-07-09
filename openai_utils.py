@@ -4,61 +4,27 @@ from config import get_openai_api_key
 
 client = openai.OpenAI(api_key=get_openai_api_key())
 
-# --- Word Meaning MCQ (معاني الكلمات) ---
+# --- Fixed Word Meaning MCQ (معاني الكلمات) ---
 PROMPT_HEADER = """
-You are an expert in Arabic language assessment. Generate a pool of at least 10 Arabic words (not including the main word), all close in meaning to the main word, as possible distractors for an MCQ.
+You are an expert in Arabic language assessment. For the given main word, generate:
+1. ONE correct synonym (closest in meaning)
+2. THREE plausible distractors (words that could confuse students but are NOT synonyms)
 
 Instructions:
-- Do NOT include the main word itself.
-- All words must be close in meaning (synonyms or semantically related).
-- Do not repeat words.
-- Do not include words with the same root as the main word.
-- Preferably, all generated choices should have the same Arabic morphological pattern (وزن) and the same number of letters as each other (e.g., all on وزن فعيل, or all on وزن مفاعل, etc.), but if this is not possible, you may relax this constraint and provide the best set of distractors you can.
-- List the pattern (وزن) you used (if any), then list the words (each on a new line, no phrases).
+- Do NOT include the main word itself
+- The correct answer should be a true synonym or very close in meaning
+- The three distractors should be plausible but clearly different in meaning
+- Avoid words with the same root as the main word
+- Preferably use the same morphological pattern (وزن) and similar letter count
+- Format: List the correct answer first, then the three distractors
 
-Examples (use this format exactly):
-
-وزن: تفعيل
-كلمات:
-تسويق
-تغليف
-تنفيذ
-ترحيل
-
-وزن: مفاعل
-كلمات:
-مآثر
-مداخل
-مراجع
-محاسن
-
-الكلمة الرئيسية: "الأصل"
-الخيارات:
-الصباح
-السحر
-الغروب
-الظهيرة
-
-الكلمة الرئيسية: "الدجى"
-الخيارات:
-الأصيل
-الظلام
-الشفق
-النور
-
-الكلمة الرئيسية: "الخضوع"
-الخيارات:
-الجحود
-القعود
-الركوع
-الخشوع
-
-الكلمة الرئيسية: "برع"
-الخيارات:
-فاق
-رام
-نام
-خاف
+Example format:
+الكلمة الرئيسية: "الشجاعة"
+الإجابة الصحيحة: البسالة
+المشتتات:
+الجبانة
+الحكمة
+السرعة
 """
 
 # --- Contextual Word Meaning MCQ (معنى الكلمة حسب السياق) ---
@@ -160,151 +126,135 @@ def share_root(word1, word2):
     w2 = normalize_al(word2)
     return w1[:3] == w2[:3] or w1[:4] == w2[:4]
 
-def is_semantically_related(main_word, candidate, client, model="gpt-4.1"):
-    prompt = f"""In Arabic, is "{normalize_al(candidate)}" a synonym (or the closest in meaning) to "{normalize_al(main_word)}"? Answer only with نعم (yes) or لا (no), or explain if close."""
+def generate_mcq_arabic_word_meaning(main_word, reference_questions, grade):
+    prompt = f"""{PROMPT_HEADER}
+الكلمة الرئيسية: "{main_word}"
+الأسئلة المرجعية: {reference_questions[:3]}
+
+أنشئ إجابة صحيحة واحدة (مرادف) وثلاثة مشتتات مناسبة للكلمة "{main_word}".
+"""
+    
     response = client.chat.completions.create(
-        model=model,
+        model="gpt-4.1",
         messages=[{"role": "user", "content": prompt}],
-        temperature=0,
-        max_tokens=20,
+        temperature=0.6,
+        max_tokens=300,
     )
-    answer = response.choices[0].message.content.strip()
-    if 'نعم' in answer:
-        return True
-    if 'قريب' in answer and 'لا' not in answer:
-        return True
-    return False
-
-def extract_candidate_words(gpt_output, main_word):
-    lines = gpt_output.strip().split('\n')
-    words = []
-    collecting = False
+    
+    gpt_output = response.choices[0].message.content.strip()
+    
+    # Extract correct answer and distractors
+    correct_answer = None
+    distractors = []
+    
+    lines = gpt_output.split('\n')
+    collecting_distractors = False
+    
     for line in lines:
-        l = line.strip()
-        if l.startswith("كلمات:") or l.startswith("الخيارات:"):
-            collecting = True
-            continue
-        if l.startswith("وزن:"):
-            collecting = False
-            continue
-        if collecting:
-            word = l.replace('-', '').replace('–', '').replace('—', '').strip()
-            if word and main_word not in word and len(word.split()) == 1 and word != "الخيارات:":
-                words.append(word)
-    if not words:
-        for line in lines:
-            word = line.strip().replace('-', '').replace('–', '').replace('—', '').strip()
-            if word and main_word not in word and len(word.split()) == 1 and word != "الخيارات:" and not word.startswith("وزن:"):
-                words.append(word)
-    return words
+        line = line.strip()
+        if line.startswith("الإجابة الصحيحة:"):
+            correct_answer = line.split(":", 1)[1].strip()
+        elif line.startswith("المشتتات:"):
+            collecting_distractors = True
+        elif collecting_distractors and line and not line.startswith("الكلمة"):
+            word = line.replace('-', '').replace('–', '').replace('—', '').strip()
+            if word and len(word.split()) == 1:
+                distractors.append(word)
+    
+    # Fallback if parsing fails
+    if not correct_answer or len(distractors) < 3:
+        return generate_fallback_mcq(main_word, client)
+    
+    # Ensure consistent "ال" usage
+    if has_al(main_word):
+        correct_answer = correct_answer if correct_answer.startswith("ال") else "ال" + correct_answer
+        distractors = [d if d.startswith("ال") else "ال" + d for d in distractors]
+    else:
+        correct_answer = correct_answer[2:] if correct_answer.startswith("ال") else correct_answer
+        distractors = [d[2:] if d.startswith("ال") else d for d in distractors]
+    
+    # Remove words with same root
+    distractors = [d for d in distractors if not share_root(main_word, d)][:3]
+    
+    # Ensure we have exactly 4 choices
+    choices = [correct_answer] + distractors
+    while len(choices) < 4:
+        fallback_word = "الخير" if has_al(main_word) else "خير"
+        choices.append(fallback_word)
+    
+    # Shuffle choices but keep track of correct answer position
+    import random
+    correct_index = 0
+    random.shuffle(choices)
+    correct_index = choices.index(correct_answer)
+    
+    letters = ['أ', 'ب', 'ج', 'د']
+    display_choices = [f"{letters[i]}) {choices[i]}" for i in range(4)]
+    question = f"ما معنى كلمة \"{main_word}\"؟\n\n" + "\n".join(display_choices)
+    answer = display_choices[correct_index]
+    
+    return question, answer, None
 
-def generate_fallback_choices(main_word, client):
-    """Generate fallback choices when the main prompt fails"""
-    prompt = f"""Generate 4 Arabic words that are synonyms or closely related in meaning to "{main_word}". Use the same form (with or without ال) as the main word. List one word per line, no explanations."""
+def generate_fallback_mcq(main_word, client):
+    """Generate fallback MCQ when main prompt fails"""
+    prompt = f"""
+    للكلمة العربية "{main_word}":
+    1. اكتب مرادف واحد صحيح
+    2. اكتب 3 كلمات مختلفة المعنى كمشتتات
+    
+    استخدم نفس الشكل (مع أو بدون ال) مثل الكلمة الأصلية.
+    اكتب كل كلمة في سطر منفصل.
+    """
+    
     response = client.chat.completions.create(
         model="gpt-4.1",
         messages=[{"role": "user", "content": prompt}],
         temperature=0.7,
-        max_tokens=100,
+        max_tokens=150,
     )
+    
     words = []
     for line in response.choices[0].message.content.strip().split('\n'):
         word = line.strip()
         if word and len(word.split()) == 1:
             words.append(word)
-    return words[:4]
-
-def generate_mcq_arabic_word_meaning(main_word, reference_questions, grade):
-    prompt = f"""{PROMPT_HEADER}
-الكلمة الرئيسية: "{main_word}"
-الأسئلة المرجعية: {reference_questions[:3]}
-اكتب وزن الكلمات التي ستستخدمها (إن أمكن)، ثم قائمة بـ10 كلمات، كل كلمة في سطر، قريبة في المعنى من "{main_word}".
-"""
-    response = client.chat.completions.create(
-        model="gpt-4.1",
-        messages=[{"role": "user", "content": prompt}],
-        temperature=0.6,
-        max_tokens=400,
-    )
-    gpt_output = response.choices[0].message.content.strip()
-    candidate_words = extract_candidate_words(gpt_output, main_word)
     
-    # Remove words with same root
-    candidate_words = [w for w in candidate_words if not share_root(main_word, w)]
+    if len(words) < 4:
+        # Ultimate fallback
+        if has_al(main_word):
+            words = ["الفهم", "الجهل", "السرعة", "القوة"]
+        else:
+            words = ["فهم", "جهل", "سرعة", "قوة"]
     
-    if len(candidate_words) < 4:
-        # Fallback: generate simple synonyms
-        fallback_words = generate_fallback_choices(main_word, client)
-        candidate_words.extend(fallback_words)
-        candidate_words = [w for w in candidate_words if not share_root(main_word, w)]
-
-    if len(candidate_words) < 4:
-        # Ultimate fallback: create basic choices with correct form
-        if has_al(main_word):
-            candidate_words.extend(["الكرم", "الجود", "العطاء", "البذل"])
-        else:
-            candidate_words.extend(["كرم", "جود", "عطاء", "بذل"])
-
-    # Ensure we have at least 4 unique words
-    candidate_words = list(dict.fromkeys(candidate_words))  # Remove duplicates while preserving order
-    candidate_words = candidate_words[:4]  # Take first 4
-
-    # Enforce "ال" consistency if main word has it
-    if has_al(main_word):
-        candidate_words = [w if w.startswith("ال") else "ال" + w for w in candidate_words]
-    else:
-        candidate_words = [w[2:] if w.startswith("ال") else w for w in candidate_words]
-
-    # Try to find semantic matches
-    correct_synonym = None
-    distractors = []
-    for w in candidate_words:
-        if is_semantically_related(main_word, w, client) and not correct_synonym:
-            correct_synonym = w
-        else:
-            distractors.append(w)
-
-    # If no semantic match found, just use first word as correct
-    if not correct_synonym and candidate_words:
-        correct_synonym = candidate_words[0]
-        distractors = candidate_words[1:]
-
-    # Ensure we have 4 choices
-    choices = [correct_synonym] + distractors[:3]
-    while len(choices) < 4:
-        if has_al(main_word):
-            choices.append("الخير")
-        else:
-            choices.append("خير")
-
+    choices = words[:4]
     letters = ['أ', 'ب', 'ج', 'د']
     display_choices = [f"{letters[i]}) {choices[i]}" for i in range(4)]
     question = f"ما معنى كلمة \"{main_word}\"؟\n\n" + "\n".join(display_choices)
-    answer = display_choices[0]
+    answer = display_choices[0]  # First word is assumed correct
     
-    msg = None
-    if len(extract_candidate_words(gpt_output, main_word)) < 4:
-        msg = "تم استخدام خيارات احتياطية لضمان توليد السؤال."
-    
-    return question, answer, msg
+    return question, answer, "تم استخدام خيارات احتياطية لضمان توليد السؤال."
 
 def generate_meaning_test_llm(num_questions, reference_questions, grade):
     questions = []
     used_words = set()
     max_attempts = num_questions * 10
     attempts = 0
+    
     prompt = (
         f"اقترح قائمة من 15 كلمة عربية مناسبة لاختبار معاني الكلمات للصف {grade} "
         "يُفضل أن تكون الكلمات شائعة في مناهج هذا الصف، وليست أسماء أعلام أو كلمات تخصصية."
         "اكتب كل كلمة في سطر منفصل، ولا تكرر الكلمات."
     )
+    
     response = client.chat.completions.create(
         model="gpt-4.1",
         messages=[{"role": "user", "content": prompt}],
         temperature=0.7,
         max_tokens=100,
     )
+    
     candidate_words = [w.strip() for w in response.choices[0].message.content.strip().split('\n') if w.strip()]
+    
     for main_word in candidate_words:
         if len(questions) >= num_questions:
             break
@@ -314,6 +264,7 @@ def generate_meaning_test_llm(num_questions, reference_questions, grade):
         q, a, msg = generate_mcq_arabic_word_meaning(main_word, reference_questions, grade)
         if q and a:
             questions.append((q, a, msg))
+    
     return questions
 
 # --- Contextual Word Meaning MCQ (معنى الكلمة حسب السياق) ---
