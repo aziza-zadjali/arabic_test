@@ -430,7 +430,7 @@ def format_contextual_question(question_sentence, target_word, choices, correct_
     if len(filtered_choices) < 4:
         return None, None
     
-    # **NEW**: Apply ال consistency to contextual choices based on target word
+    # Apply ال consistency to contextual choices based on target word
     choice_words = []
     choice_labels = []
     
@@ -448,9 +448,9 @@ def format_contextual_question(question_sentence, target_word, choices, correct_
     for i, (label, word) in enumerate(zip(choice_labels, normalized_choice_words)):
         formatted_choices.append(f"{label}) {word}")
     
-    # Format the question with proper spacing and line breaks
-    formatted_question = f"**السؤال:** {question_sentence}\n\n"
-    formatted_question += f"**ما معنى كلمة \"{target_word}\" في السياق أعلاه؟**\n\n"
+    # Format the question WITHOUT markdown formatting
+    formatted_question = f"السؤال: {question_sentence}\n\n"
+    formatted_question += f"ما معنى كلمة \"{target_word}\" في السياق أعلاه؟\n\n"
     
     # Add choices with proper formatting - each on a new line
     for choice in formatted_choices:
