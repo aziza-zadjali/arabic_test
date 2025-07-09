@@ -90,68 +90,59 @@ Examples showing different approaches:
 # --- Contextual Word Meaning MCQ (معنى الكلمة حسب السياق) ---
 CONTEXTUAL_PROMPT = """
 أنت خبير في إعداد أسئلة اللغة العربية. أنشئ سؤال اختيار من متعدد لمعنى كلمة في سياق جملة.
-يتكون كل سؤال من جملة تحتوي على كلمة تحتها خط، والمطلوب منك أن تستنتج المعنى الأقرب لتلك الكلمة من بين البدائل الأربعة المعطاة، بحيث إذا استخدم البديل الصحيح فإنه سيعطي المعنى نفسه للجملة.
 
 التعليمات:
-- الجملة يجب أن تحتوي على كلمة واحدة تحتها خط.
-- أعطِ أربعة خيارات للإجابة (أ، ب، ج، د).
-- خيار واحد فقط هو الصحيح (مرادف أو الأقرب معنى في السياق).
-- وضّح رمز الإجابة الصحيحة في نهاية السؤال.
+- أنشئ جملة تحتوي على كلمة واحدة مهمة (لا تضع خط تحتها)
+- أعطِ أربعة خيارات للإجابة (أ، ب، ج، د)
+- خيار واحد فقط هو الصحيح (مرادف أو الأقرب معنى في السياق)
 - **PREFERRED**: Try to ensure all four answer choices have the same Arabic morphological pattern (وزن) and similar letter count when possible
 - **FLEXIBILITY**: If better educational distractors are available that don't match the pattern, prioritize educational value over pattern consistency
-- The morphological pattern matching applies ONLY to the answer choices themselves, NOT to the underlined word
-- لا تدرج كلمات تشترك في الجذر مع الكلمة التي تحتها خط.
+- The morphological pattern matching applies ONLY to the answer choices themselves, NOT to the word in context
+- لا تدرج كلمات تشترك في الجذر مع الكلمة المستهدفة
+- اكتب السؤال بوضوح مع الخيارات منفصلة
+
+تنسيق الإجابة المطلوب:
+السؤال: [الجملة هنا]
+ما معنى كلمة "[الكلمة المستهدفة]" في السياق أعلاه؟
+
+أ) [الخيار الأول]
+ب) [الخيار الثاني]  
+ج) [الخيار الثالث]
+د) [الخيار الرابع]
+
+الإجابة الصحيحة: ([الحرف])
 
 أمثلة:
-1. ما رمز الكلمة الصحيحة التي تعتبر الأقرب معنى للكلمة التي تحتها خط في الجملة الموجودة في رأس السؤال؟
-وَجَمَ الرجل بعد أن طُرد من عمله:
-أ- شرد
-ب- تعب
-ج- عبس
-د- سكت
 
-نلاحظ أن رمز الإجابة الصحيحة هو (ج) حيث أن كلمة (عبس) هي الأقرب معنى لكلمة (وَجَم)، وفي حالة استخدامها في الجملة كبديل لكلمة (وجم) فإنها تعطي المعنى الصحيح للجملة، أما بقية البدائل الأخرى فلا تدل على المعنى الصحيح.
+السؤال: وَجَمَ الرجل بعد أن طُرد من عمله
+ما معنى كلمة "وَجَم" في السياق أعلاه؟
 
-2. ما رمز الكلمة الصحيحة التي تعتبر الأقرب معنى للكلمة التي تحتها خط في الجملة الموجودة في رأس السؤال؟
-يحظى المواطن بالحرية في بلاده:
-أ- يدعو
-ب- يفرح
-ج- يحيى
-د- ينال
+أ) شرد
+ب) تعب
+ج) عبس
+د) سكت
 
-نلاحظ أن رمز الإجابة الصحيحة هو (د) حيث أن كلمة (ينال) هي الأقرب معنى لكلمة (يحظى)، وفي حالة استخدامها في الجملة كبديل لكلمة (يحظى) فإنها تعطي المعنى الصحيح للجملة، أما بقية البدائل الأخرى فلا تدل على المعنى الصحيح.
+الإجابة الصحيحة: (ج)
 
-3. بهرَ فلانٌ نظراءهُ:
-أ- سادَ
-ب- قادَ
-ج- فاقَ
-د- لامَ
+السؤال: يحظى المواطن بالحرية في بلاده
+ما معنى كلمة "يحظى" في السياق أعلاه؟
 
-نلاحظ أن رمز الإجابة الصحيحة هو (ج) حيث أن كلمة (فاقَ) هي الأقرب معنى لكلمة (بهرَ) في هذا السياق.
+أ) يدعو
+ب) يفرح
+ج) يحيى
+د) ينال
 
-4. "والليل إذا عسعس":
-أ- طال
-ب- أظلم
-ج- قصر
-د- أمطر
+الإجابة الصحيحة: (د)
 
-نلاحظ أن رمز الإجابة الصحيحة هو (ب) حيث أن كلمة (أظلم) هي الأقرب معنى لكلمة (عسعس) في هذا السياق.
+السؤال: بهرَ فلانٌ نظراءه
+ما معنى كلمة "بهر" في السياق أعلاه؟
 
-5. انبثق الماء غزيرا:
-أ- انحصر
-ب- انتشر
-ج- انقطع
-د- اندفع
+أ) سادَ
+ب) قادَ
+ج) فاقَ
+د) لامَ
 
-نلاحظ أن رمز الإجابة الصحيحة هو (د) حيث أن كلمة (اندفع) هي الأقرب معنى لكلمة (انبثق) في هذا السياق.
-
-6. اشرأبت الزرافات بأعناقها:
-أ- امتدّت
-ب- اشتدّت
-ج- قصرت
-د- ابتهجت
-
-نلاحظ أن رمز الإجابة الصحيحة هو (أ) حيث أن كلمة (امتدّت) هي الأقرب معنى لكلمة (اشرأبت) في هذا السياق.
+الإجابة الصحيحة: (ج)
 """
 
 def has_al(word):
@@ -342,137 +333,103 @@ def generate_meaning_test_llm(num_questions, reference_questions, grade):
     return questions
 
 # --- Contextual Word Meaning MCQ (معنى الكلمة حسب السياق) ---
-def extract_contextual_mcq_parts(gpt_output):
-    question_part = gpt_output.split('\n\nنلاحظ')[0] if '\n\nنلاحظ' in gpt_output else gpt_output
-
-    answer_letter = None
-    answer_line = None
-    for line in gpt_output.split('\n'):
-        line = line.strip()
-        match = re.search(r'رمز الإجابة الصحيحة(?: هو)?\s*[\:\(]?\s*([أ-د])[\)\s]*', line)
-        if match:
-            answer_letter = match.group(1)
-            answer_line = f"الإجابة الصحيحة: ({answer_letter})"
-            break
-        match2 = re.search(r'الإجابة الصحيحة\s*[:\(]?\s*([أ-د])[\)\s]*', line)
-        if match2:
-            answer_letter = match2.group(1)
-            answer_line = f"الإجابة الصحيحة: ({answer_letter})"
-            break
-
-    return question_part.strip(), answer_line
-
-def extract_underlined_word(question_text):
-    match = re.search(r'_(\w+)_', question_text)
-    if match:
-        return match.group(1)
-    return None
-
-def enforce_al_in_context_choices(choices, underlined_word):
-    if not underlined_word or not has_al(underlined_word):
-        return choices
-    ensured = []
-    for c in choices:
-        m = re.match(r'^([أ-د][\)\-]?)\s*(.+)', c)
-        if m:
-            label, word = m.group(1), m.group(2)
-            if not word.startswith("ال"):
-                word = "ال" + word
-            ensured.append(f"{label} {word}")
-        else:
-            ensured.append(c)
-    return ensured
-
-def format_contextual_question(question_text):
-    """Format contextual question for better readability"""
-    lines = question_text.split('\n')
-    formatted_lines = []
+def parse_contextual_response(gpt_output):
+    """Parse the structured contextual response"""
+    lines = gpt_output.strip().split('\n')
     
-    for line in lines:
-        line = line.strip()
-        if not line:
-            continue
-            
-        # Check if it's a choice line (starts with أ- ب- ج- د-)
-        if re.match(r'^[أ-د][\)\-]', line):
-            formatted_lines.append(f"  {line}")
-        else:
-            formatted_lines.append(line)
+    question_sentence = ""
+    target_word = ""
+    choices = []
+    correct_answer = ""
     
-    return '\n'.join(formatted_lines)
+    i = 0
+    while i < len(lines):
+        line = lines[i].strip()
+        
+        if line.startswith("السؤال:"):
+            question_sentence = line.replace("السؤال:", "").strip()
+        elif line.startswith("ما معنى كلمة"):
+            # Extract target word from this line
+            match = re.search(r'"([^"]+)"', line)
+            if match:
+                target_word = match.group(1)
+        elif re.match(r'^[أ-د][\)\s]', line):
+            choices.append(line)
+        elif line.startswith("الإجابة الصحيحة:"):
+            match = re.search(r'\(([أ-د])\)', line)
+            if match:
+                correct_answer = match.group(1)
+        
+        i += 1
+    
+    return question_sentence, target_word, choices, correct_answer
+
+def format_contextual_question(question_sentence, target_word, choices, correct_answer):
+    """Format the contextual question properly"""
+    if not all([question_sentence, target_word, choices, correct_answer]):
+        return None, None
+    
+    # Format the question
+    formatted_question = f"**السؤال:** {question_sentence}\n\n"
+    formatted_question += f"**ما معنى كلمة \"{target_word}\" في السياق أعلاه؟**\n\n"
+    
+    # Add choices with proper formatting
+    for choice in choices:
+        formatted_question += f"{choice}\n"
+    
+    # Format the answer
+    formatted_answer = f"الإجابة الصحيحة: ({correct_answer})"
+    
+    return formatted_question.strip(), formatted_answer
 
 def generate_mcq_contextual_word_meaning(reference_questions, grade):
-    prompt = CONTEXTUAL_PROMPT + "\n\nيرجى توليد سؤال واحد فقط بالتنسيق أعلاه."
-    try:
-        response = client.chat.completions.create(
-            model="gpt-4.1",
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.6,
-            max_tokens=400,
-        )
-        gpt_output = response.choices[0].message.content.strip()
-        question_part, answer_line = extract_contextual_mcq_parts(gpt_output)
-
-        # Basic validation - ensure we have both question and answer
-        if not question_part or not answer_line:
-            return None, None
-
-        lines = question_part.split('\n')
-        choices = []
-        question_lines = []
-        
-        for line in lines:
-            line = line.strip()
-            if not line:
+    prompt = CONTEXTUAL_PROMPT + "\n\nيرجى توليد سؤال واحد فقط بالتنسيق المحدد أعلاه."
+    
+    max_retries = 3
+    for attempt in range(max_retries):
+        try:
+            response = client.chat.completions.create(
+                model="gpt-4.1",
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.6,
+                max_tokens=400,
+            )
+            
+            gpt_output = response.choices[0].message.content.strip()
+            
+            # Parse the response
+            question_sentence, target_word, choices, correct_answer = parse_contextual_response(gpt_output)
+            
+            # Validate we have all required components
+            if not all([question_sentence, target_word, choices, correct_answer]) or len(choices) < 4:
                 continue
+            
+            # Format the question properly
+            formatted_question, formatted_answer = format_contextual_question(
+                question_sentence, target_word, choices, correct_answer
+            )
+            
+            if formatted_question and formatted_answer:
+                return formatted_question, formatted_answer
                 
-            # Check if it's a choice line
-            m = re.match(r'^([أ-د][\)\-]?)\s*(.+)', line)
-            if m:
-                choices.append(f"{m.group(1)}) {m.group(2)}")
-            else:
-                question_lines.append(line)
-        
-        # Ensure we have at least 4 choices
-        if len(choices) < 4:
-            return None, None
-            
-        underlined_word = extract_underlined_word(question_part)
-
-        filtered_choices = []
-        for c in choices:
-            m = re.match(r'^([أ-د][\)\-]?)\s*(.+)', c)
-            if m and underlined_word:
-                if not share_root(underlined_word, m.group(2)):
-                    filtered_choices.append(c)
-            else:
-                filtered_choices.append(c)
-        
-        # If we filtered out too many choices, use original choices
-        if len(filtered_choices) < 4:
-            filtered_choices = choices
-            
-        filtered_choices = enforce_al_in_context_choices(filtered_choices, underlined_word)
-        
-        # Format the final question with proper line breaks
-        formatted_question = '\n'.join(question_lines) + '\n\n' + '\n'.join(filtered_choices)
-        
-        return formatted_question.strip(), answer_line
-    except Exception as e:
-        return None, None
+        except Exception as e:
+            continue
+    
+    return None, None
 
 def generate_contextual_test_llm(num_questions, reference_questions, grade):
     questions = []
-    max_attempts = num_questions * 20  # Increased attempts to ensure we get the requested number
+    max_attempts = num_questions * 25  # Increased attempts significantly
     attempts = 0
     
     while len(questions) < num_questions and attempts < max_attempts:
         attempts += 1
         try:
             q, answer_line = generate_mcq_contextual_word_meaning(reference_questions, grade)
-            if q and answer_line and len(q.strip()) > 50:  # Basic quality check
+            if q and answer_line:
                 questions.append((q, answer_line))
+                print(f"Generated question {len(questions)}/{num_questions}")  # Debug output
         except Exception as e:
-            continue  # Skip failed attempts and try again
+            continue
     
     return questions
