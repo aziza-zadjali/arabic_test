@@ -8,7 +8,7 @@ from question_generator import (
     generate_contextual_test
 )
 
-# Custom CSS for better formatting without boxes
+# Custom CSS for better formatting without markdown symbols
 st.markdown("""
 <style>
 .question-title {
@@ -87,7 +87,7 @@ selected_skill_label = list(skills.keys())[0]
 selected_skill_folder = skills[selected_skill_label]
 
 def display_formatted_question(question_text, question_number=None):
-    """Display question with enhanced formatting without boxes"""
+    """Display question with enhanced formatting without markdown"""
     lines = question_text.split('\n')
     
     # Extract question title and choices
@@ -118,11 +118,11 @@ def display_formatted_question(question_text, question_number=None):
         st.markdown(f'<div class="choice-item">{choice}</div>', unsafe_allow_html=True)
 
 def display_contextual_question(question_text, question_number=None):
-    """Display contextual questions with special formatting"""
+    """Display contextual questions with special formatting - no markdown"""
     if question_number:
         st.markdown(f'<div class="question-title">السؤال {question_number}:</div>', unsafe_allow_html=True)
     
-    # Parse the question content
+    # Parse the question content - remove any markdown formatting
     lines = question_text.split('\n')
     question_content = []
     choices = []
@@ -131,6 +131,8 @@ def display_contextual_question(question_text, question_number=None):
         line = line.strip()
         if not line:
             continue
+        # Remove markdown formatting
+        line = line.replace('**', '')
         if re.match(r'^[أ-د][\)\-]', line):
             choices.append(line)
         else:
