@@ -1,7 +1,5 @@
 import streamlit as st
-
 from reference_loader import load_reference_questions
-
 from question_generator import (
     create_question,
     generate_meaning_test,
@@ -27,6 +25,7 @@ question_type = st.selectbox(
     ]
 )
 
+# Set defaults
 selected_grade = grades[0]
 selected_skill_label = list(skills.keys())[0]
 selected_skill_folder = skills[selected_skill_label]
@@ -69,30 +68,34 @@ elif question_type == "اختبار معاني الكلمات (تلقائي)":
 elif question_type == "معنى الكلمة حسب السياق":
     num_questions = st.slider("عدد الأسئلة في الاختبار", 1, 5, 1)
     if st.button("توليد سؤال/اختبار"):
-        with st.spinner("يتم توليد السؤال..."):
+        with st.spinner("يتم توليد الأسئلة..."):
             grade_folder = "الصف_السابع_والثامن"
             reference_questions = load_reference_questions(grade_folder, selected_skill_folder)
             if not reference_questions:
                 st.error("لا توجد أسئلة مرجعية في هذه المرحلة/المهارة. تأكد من وجود الملفات في المسار الصحيح.")
             else:
-                if num_questions == 1:
-                    question, answer_line = generate_contextual_question(reference_questions, selected_grade)
-                    if question and answer_line:
-                        # Format the question with proper line breaks
-                        formatted_question = question.replace('\n\n', '\n\n')
-                        st.markdown(f"**السؤال:**\n\n{formatted_question}")
-                        st.success(answer_line)
-                    else:
-                        st.error("تعذر توليد السؤال. حاول مجددًا.")
-                else:
-                    test = generate_contextual_test(num_questions, reference_questions, selected_grade)
-                    if not test:
-                        st.error("تعذر توليد عدد كافٍ من الأسئلة السياقية. حاول مجددًا أو قلل العدد.")
-                    else:
+                # Always use the test function to ensure consistent behavior
+                test = generate_contextual_test(num_questions, reference_questions, selected_grade)
+                
+                if not test or len(test) < num_questions:
+                    st.error(f"تعذر توليد العدد المطلوب من الأسئلة السياقية ({num_questions}). تم توليد {len(test) if test else 0} أسئلة فقط. حاول مجددًا.")
+                    
+                    # Display whatever questions were generated
+                    if test:
                         for idx, (question, answer_line) in enumerate(test, 1):
-                            # Format each question with proper line breaks
-                            formatted_question = question.replace('\n\n', '\n\n')
-                            st.markdown(f"**السؤال {idx}:**\n\n{formatted_question}")
-                            if answer_line:
-                                st.success(answer_line)
-                            st.markdown("---")  # Add separator between questions
+                            st.markdown(f"**السؤال {idx}:**")
+                            st.markdown(question)
+                            st.success(answer_line)
+                            if idx < len(test):
+                                st.markdown("---")
+                else:
+                    st.success(f"تم توليد {len(test)} أسئلة بنجاح!")
+                    
+                    for idx, (question, answer_line) in enumerate(test, 1):
+                        st.markdown(f"**السؤال {idx}:**")
+                        st.markdown(question)
+                        st.success(answer_line)
+                        
+                        # Add separator between questions (except for the last one)
+                        if idx < len(test):
+                            st.markdown("---")
