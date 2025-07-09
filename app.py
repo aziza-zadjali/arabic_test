@@ -1,5 +1,7 @@
 import streamlit as st
+
 from reference_loader import load_reference_questions
+
 from question_generator import (
     create_question,
     generate_meaning_test,
@@ -75,14 +77,22 @@ elif question_type == "معنى الكلمة حسب السياق":
             else:
                 if num_questions == 1:
                     question, answer_line = generate_contextual_question(reference_questions, selected_grade)
-                    st.markdown(question)
-                    if answer_line:
+                    if question and answer_line:
+                        # Format the question with proper line breaks
+                        formatted_question = question.replace('\n\n', '\n\n')
+                        st.markdown(f"**السؤال:**\n\n{formatted_question}")
                         st.success(answer_line)
+                    else:
+                        st.error("تعذر توليد السؤال. حاول مجددًا.")
                 else:
                     test = generate_contextual_test(num_questions, reference_questions, selected_grade)
                     if not test:
                         st.error("تعذر توليد عدد كافٍ من الأسئلة السياقية. حاول مجددًا أو قلل العدد.")
-                    for idx, (question, answer_line) in enumerate(test, 1):
-                        st.markdown(f"**{idx}. {question}**")
-                        if answer_line:
-                            st.success(answer_line)
+                    else:
+                        for idx, (question, answer_line) in enumerate(test, 1):
+                            # Format each question with proper line breaks
+                            formatted_question = question.replace('\n\n', '\n\n')
+                            st.markdown(f"**السؤال {idx}:**\n\n{formatted_question}")
+                            if answer_line:
+                                st.success(answer_line)
+                            st.markdown("---")  # Add separator between questions
