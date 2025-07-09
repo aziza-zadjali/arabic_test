@@ -44,7 +44,9 @@ if question_type == "معنى الكلمة":
                 question, answer, msg = create_question(main_word, reference_questions, selected_grade)
                 if msg:
                     st.warning(msg)
-                st.markdown(question)
+                # Display question with proper formatting
+                st.markdown("**السؤال:**")
+                st.text(question)  # Using st.text to preserve line breaks
                 st.success(f"الإجابة الصحيحة: {answer}")
 
 elif question_type == "اختبار معاني الكلمات (تلقائي)":
@@ -62,8 +64,11 @@ elif question_type == "اختبار معاني الكلمات (تلقائي)":
                 for idx, (question, answer, msg) in enumerate(test, 1):
                     if msg:
                         st.warning(f"سؤال {idx}: {msg}")
-                    st.markdown(f"**{idx}. {question}**")
+                    st.markdown(f"**السؤال {idx}:**")
+                    st.text(question)  # Using st.text to preserve line breaks
                     st.success(f"الإجابة الصحيحة: {answer}")
+                    if idx < len(test):
+                        st.markdown("---")
 
 elif question_type == "معنى الكلمة حسب السياق":
     num_questions = st.slider("عدد الأسئلة في الاختبار", 1, 5, 1)
@@ -84,7 +89,7 @@ elif question_type == "معنى الكلمة حسب السياق":
                     if test:
                         for idx, (question, answer_line) in enumerate(test, 1):
                             st.markdown(f"**السؤال {idx}:**")
-                            st.markdown(question)
+                            st.markdown(question)  # Using markdown for contextual questions
                             st.success(answer_line)
                             if idx < len(test):
                                 st.markdown("---")
@@ -93,7 +98,7 @@ elif question_type == "معنى الكلمة حسب السياق":
                     
                     for idx, (question, answer_line) in enumerate(test, 1):
                         st.markdown(f"**السؤال {idx}:**")
-                        st.markdown(question)
+                        st.markdown(question)  # Using markdown for contextual questions
                         st.success(answer_line)
                         
                         # Add separator between questions (except for the last one)
