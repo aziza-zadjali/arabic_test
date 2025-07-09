@@ -448,9 +448,10 @@ def format_contextual_question(question_sentence, target_word, choices, correct_
     for i, (label, word) in enumerate(zip(choice_labels, normalized_choice_words)):
         formatted_choices.append(f"{label}) {word}")
     
-    # Format the question WITHOUT markdown formatting
-    formatted_question = f"السؤال: {question_sentence}\n\n"
-    formatted_question += f"ما معنى كلمة \"{target_word}\" في السياق أعلاه؟\n\n"
+    # **FIXED**: Format with proper line breaks for each component
+    formatted_question = f"السؤال:\n"  # Label on its own line
+    formatted_question += f"{question_sentence}\n\n"  # Sentence on its own line with spacing
+    formatted_question += f"ما معنى كلمة \"{target_word}\" في السياق أعلاه؟\n\n"  # Question on its own line
     
     # Add choices with proper formatting - each on a new line
     for choice in formatted_choices:
@@ -459,6 +460,7 @@ def format_contextual_question(question_sentence, target_word, choices, correct_
     formatted_answer = f"الإجابة الصحيحة: ({correct_answer})"
     
     return formatted_question.strip(), formatted_answer
+
 
 def generate_mcq_contextual_word_meaning(reference_questions, grade):
     prompt = CONTEXTUAL_PROMPT + "\n\nيرجى توليد سؤال واحد فقط بالتنسيق المحدد أعلاه. لا تكتب أي نص تمهيدي."
